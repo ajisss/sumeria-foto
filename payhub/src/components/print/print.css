@@ -1,0 +1,19 @@
+/* Dokumen cetak selalu terang & print-safe, apa pun tema aplikasinya. */
+.print-doc {
+  --doc-bg: #ffffff;
+  --doc-ink: #1c1f22;
+  --doc-ink-soft: #6e7580;
+  --doc-line: #e5e8ec;
+  --doc-blue: #1e3a5f;
+  --doc-green: #1f7a4d;
+  --doc-amber: #8a5f1e;
+  color-scheme: light;
+  background: var(--doc-bg);
+  color: var(--doc-ink);
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+}
