@@ -198,7 +198,7 @@ function uiPages(cur, n) {
   a.forEach((x, i) => { if (i && x - a[i - 1] > 1) o.push("…" + i); o.push(x); });
   return o;
 }
-function Table({ className, children, paginate, ...p }) {
+function Table({ className, children, paginate, fit: fitOn, ...p }) {
   const h = React.createElement;
   const ref = React.useRef(null);
   const wrapRef = React.useRef(null);
@@ -225,7 +225,7 @@ function Table({ className, children, paginate, ...p }) {
     const w = wrapRef.current;
     if (!w) return;
     w.style.maxHeight = "none";
-    if (w.closest(".modal-panel") || document.querySelectorAll(".ui-tscroll").length !== 1) return;
+    if (fitOn === false || w.closest(".modal-panel") || document.querySelectorAll(".ui-tscroll").length !== 1) return;
     let sp = w.parentElement;
     while (sp && sp !== document.body) {
       const oy = getComputedStyle(sp).overflowY;

@@ -382,48 +382,48 @@ function UsersPage({ ctx }) {
     h(PageHeader, {
       title: "Pengguna",
       subtitle: "Kelola akses tim. Akun dibuat lewat undangan email.",
-      action: h(Button, { onClick: () => setInvite(true) }, "Undang pengguna"),
+      action: h(Button, { icon: Plus, onClick: () => setInvite(true) }, "Undang pengguna"),
     }),
     loadErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 13 } }, loadErr),
     !users && !loadErr && h("p", { style: { color: BRAND.inkSoft } }, "Memuat…"),
     users &&
-      h(Card, { style: { padding: 0, overflowX: "auto" } },
-        h("table", null,
-          h("thead", null, h("tr", null, ["Nama", "Email", "Role", "Status", ""].map((c, i) => h("th", { key: i }, c)))),
-          h("tbody", null, users.map((u) =>
-            h("tr", { key: u.id },
-              h("td", null, u.name, u.id === me.id && h("span", { style: { color: BRAND.inkSoft } }, " (kamu)")),
-              h("td", null, u.email),
-              h("td", null,
+      h(Card, { style: { padding: 0, overflowX: "auto" } }, h(Table, null,
+          h(TableHeader, null, h(TableRow, null, ["Nama", "Email", "Role", "Status", ""].map((c, i) => h(TableHead, { key: i }, c)))),
+          h(TableBody, null, users.map((u) =>
+            h(TableRow, { key: u.id },
+              h(TableCell, { style: { fontWeight: 600 } }, u.name, u.id === me.id && h("span", { style: { color: BRAND.inkSoft } }, " (kamu)")),
+              h(TableCell, null, u.email),
+              h(TableCell, null,
                 manageable(u)
-                  ? h("select", {
+                  ? h(UiSelect, {
                       value: u.role,
                       "aria-label": "Role " + u.email,
                       onChange: (e) => setConfirm({ title: "Ubah role", message: `Ubah role ${u.email} menjadi ${ROLE_LABEL[e.target.value]}? Sesi login user ini akan diakhiri.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { role: e.target.value } }), "Role diperbarui") }),
                       style: { ...inputStyle, width: "auto", padding: "5px 8px" },
                     }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))
                   : h(Badge, { tone: "gray" }, ROLE_LABEL[u.role] || u.role)),
-              h("td", null, h(Badge, { tone: u.banned ? "red" : "green" }, u.banned ? "Nonaktif" : "Aktif")),
-              h("td", { style: { textAlign: "right", whiteSpace: "nowrap" } },
-                manageable(u) && !u.banned && h(Button, { size: "sm", variant: "ghost", onClick: () => act(() => apiFetch("/api/users/" + u.id + "/resend-invite", { method: "POST", body: {} }), "Tautan dikirim ulang") }, "Kirim ulang tautan"),
-                manageable(u) && h(Button, { size: "sm", variant: "ghost", onClick: () => setConfirm({ title: u.banned ? "Aktifkan akun" : "Nonaktifkan akun", message: u.banned ? `Aktifkan kembali ${u.email}?` : `Nonaktifkan ${u.email}? User ini langsung keluar dan tidak bisa masuk.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { banned: !u.banned } }), u.banned ? "Akun diaktifkan" : "Akun dinonaktifkan") }) }, u.banned ? "Aktifkan" : "Nonaktifkan"))))))),
+              h(TableCell, null, h(Badge, { tone: u.banned ? "red" : "green" }, u.banned ? "Nonaktif" : "Aktif")),
+              h(TableCell, { style: { textAlign: "right", whiteSpace: "nowrap" } },
+                h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+                  manageable(u) && !u.banned && h(IconBtn, { icon: Mail, title: "Kirim ulang tautan", onClick: () => act(() => apiFetch("/api/users/" + u.id + "/resend-invite", { method: "POST", body: {} }), "Tautan dikirim ulang") }),
+                  manageable(u) && h(IconBtn, { icon: u.banned ? Check : Lock, tone: u.banned ? "default" : "danger", title: u.banned ? "Aktifkan" : "Nonaktifkan", onClick: () => setConfirm({ title: u.banned ? "Aktifkan akun" : "Nonaktifkan akun", message: u.banned ? `Aktifkan kembali ${u.email}?` : `Nonaktifkan ${u.email}? User ini langsung keluar dan tidak bisa masuk.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { banned: !u.banned } }), u.banned ? "Akun diaktifkan" : "Akun dinonaktifkan") }) })))))))),
     invite &&
-      h(Modal, { title: "Undang pengguna", onClose: () => setInvite(false), width: 440 },
+      h(Modal, { title: "Undang pengguna", subtitle: "Kirim undangan email agar anggota tim bisa membuat akun.", icon: Users, onClose: () => setInvite(false), width: 440 },
         h("form", { onSubmit: submitInvite, noValidate: true },
           h(Field, { label: "Nama" }, h("input", { style: inputStyle, value: form.name, maxLength: 100, onChange: (e) => setForm({ ...form, name: e.target.value }), autoFocus: true })),
           h(Field, { label: "Email" }, h("input", { style: inputStyle, type: "email", value: form.email, onChange: (e) => setForm({ ...form, email: e.target.value }) })),
-          h(Field, { label: "Role" }, h("select", { style: inputStyle, value: form.role, onChange: (e) => setForm({ ...form, role: e.target.value }) }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))),
+          h(Field, { label: "Role" }, h(UiSelect, { style: inputStyle, value: form.role, onChange: (e) => setForm({ ...form, role: e.target.value }) }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))),
           h("p", { style: { fontSize: 12, color: BRAND.inkSoft, lineHeight: 1.5 } }, "Staff: customer, quotation, invoice. Viewer: hanya lihat. Admin: semua data + kelola staff/viewer. Owner: semuanya."),
           formErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 12.5 } }, formErr),
           h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
-            h(Button, { variant: "ghost", onClick: () => setInvite(false) }, "Batal"),
-            h(Button, { type: "submit", disabled: busy }, busy ? "Mengirim…" : "Kirim undangan")))),
+            h(Button, { variant: "secondary", icon: X, onClick: () => setInvite(false) }, "Batal"),
+            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Mengirim…" : "Kirim undangan")))),
     confirm &&
       h(Modal, { title: confirm.title, onClose: () => setConfirm(null), width: 420 },
         h("p", { style: { fontSize: 13.5, lineHeight: 1.5, color: BRAND.ink } }, confirm.message),
         h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 } },
-          h(Button, { variant: "ghost", onClick: () => { setConfirm(null); load(); } }, "Batal"),
-          h(Button, { onClick: () => { const run = confirm.run; setConfirm(null); run(); } }, "Lanjut"))),
+          h(Button, { variant: "secondary", icon: X, onClick: () => { setConfirm(null); load(); } }, "Batal"),
+          h(Button, { icon: Check, onClick: () => { const run = confirm.run; setConfirm(null); run(); } }, "Lanjut"))),
   );
 }
 

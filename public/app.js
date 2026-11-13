@@ -461,6 +461,14 @@ const Search = makeIcon(
       }),
     ),
   ),
+  Mail = makeIcon(
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement("rect", { x: "3", y: "5", width: "18", height: "14", rx: "2" }),
+      React.createElement("path", { d: "m3 7 9 6 9-6" }),
+    ),
+  ),
   Lock = makeIcon(
     React.createElement(
       React.Fragment,
@@ -904,6 +912,7 @@ const Search = makeIcon(
       exp_field_qty: "Qty",
       exp_field_unitprice: "Unit price",
       exp_field_total: "Total",
+      exp_add_btn: "Tambah pengeluaran",
       exp_add_row: "Tambah baris item",
       exp_save_all: "Simpan semua item",
       exp_empty_prefix: "Belum ada",
@@ -944,6 +953,10 @@ const Search = makeIcon(
       margin_col_expense: "Expense",
       margin_col_profit: "Profit",
       margin_col_margin: "Margin",
+      margin_f_all: "Semua margin",
+      margin_f_good: "Sehat (≥35%)",
+      margin_f_mid: "Sedang (25–35%)",
+      margin_f_low: "Rendah (<25%)",
       best_title: "Paket Terlaris",
       best_subtitle:
         "Ranking package item berdasarkan penjualan dari semua invoice",
@@ -1283,6 +1296,7 @@ const Search = makeIcon(
       exp_field_qty: "Qty",
       exp_field_unitprice: "Unit price",
       exp_field_total: "Total",
+      exp_add_btn: "Add expense",
       exp_add_row: "Add item row",
       exp_save_all: "Save all items",
       exp_empty_prefix: "No",
@@ -1323,6 +1337,10 @@ const Search = makeIcon(
       margin_col_expense: "Expense",
       margin_col_profit: "Profit",
       margin_col_margin: "Margin",
+      margin_f_all: "All margins",
+      margin_f_good: "Healthy (≥35%)",
+      margin_f_mid: "Medium (25–35%)",
+      margin_f_low: "Low (<25%)",
       best_title: "Best Sellers",
       best_subtitle: "Package item ranking based on sales across all invoices",
       best_empty: "No sales data yet. It appears once invoices have items.",
@@ -6007,7 +6025,8 @@ function ExpensesPage({ ctx: o }) {
     [u, y] = useState([blankExpenseRow("Project")]),
     [c, m] = useState(""),
     [k, C] = useState({ key: "date", dir: "desc" }),
-    [P, w] = useState(null);
+    [P, w] = useState(null),
+    [mo, setMo] = useState(!1);
   useEffect(() => {
     (y([blankExpenseRow(e)]), v(""));
   }, [e]);
@@ -6050,7 +6069,8 @@ function ExpensesPage({ ctx: o }) {
     }));
     (t((_) => [..._, ...z]),
       y([blankExpenseRow(e)]),
-      TT && TT("Expense saved ✓"));
+      TT && TT("Expense saved ✓"),
+      setMo(!1));
   }
   const b = a.map((x) => ({
       ...x,
@@ -6077,53 +6097,20 @@ function ExpensesPage({ ctx: o }) {
     React.createElement(PageHeader, {
       title: n("exp_title"),
       subtitle: n("exp_subtitle"),
+      search: React.createElement(SearchBox, { value: c, onChange: m, placeholder: n("search_placeholder") }),
+      action: React.createElement(Button, { icon: Plus, onClick: () => setMo(!0) }, n("exp_add_btn")),
     }),
     React.createElement(
       "div",
-      {
-        style: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
-      },
+      { className: "ui-tabs", role: "tablist" },
       CATEGORIES.map((x) =>
-        React.createElement(
-          "button",
-          {
-            key: x,
-            onClick: () => l(x),
-            style: {
-              padding: "8px 16px",
-              borderRadius: 999,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: "pointer",
-              border: `1px solid ${e === x ? BRAND.blue : BRAND.line}`,
-              background: e === x ? BRAND.blue : BRAND.surface,
-              color: e === x ? "var(--c-onBlue)" : BRAND.inkSoft,
-            },
-          },
-          x,
-          " expense",
-        ),
+        React.createElement("button", { key: x, type: "button", role: "tab", "aria-selected": e === x, className: "ui-tab" + (e === x ? " on" : ""), onClick: () => l(x) }, x, " expense"),
       ),
     ),
+    mo &&
     React.createElement(
-      Card,
-      { style: { marginBottom: 18 } },
-      React.createElement(
-        "div",
-        {
-          style: {
-            fontSize: 13,
-            fontWeight: 600,
-            marginBottom: 14,
-            color: BRAND.inkSoft,
-          },
-        },
-        n("exp_input_title"),
-        " ",
-        e,
-        " expense ",
-        e === "Project" && n("exp_input_hint"),
-      ),
+      Modal,
+      { title: `${n("exp_input_title")} ${e} expense`, subtitle: e === "Project" ? n("exp_input_hint").replace(/^\(|\)$/g, "") : void 0, icon: Wallet, onClose: () => setMo(!1), width: 820 },
       React.createElement(
         "div",
         {
@@ -6343,23 +6330,11 @@ function ExpensesPage({ ctx: o }) {
         ),
       ),
       React.createElement(
-        Button,
-        { icon: Save,
-          onClick: h,
-          disabled: e === "Project" && !f,
-          style: { marginTop: 12 },
-        },
-        n("exp_save_all"),
+        "div",
+        { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 } },
+        React.createElement(Button, { variant: "secondary", icon: X, onClick: () => setMo(!1) }, n("cancel")),
+        React.createElement(Button, { icon: Save, onClick: h, disabled: e === "Project" && !f }, n("exp_save_all")),
       ),
-    ),
-    React.createElement(
-      Card,
-      { style: { marginBottom: 14, padding: 12 } },
-      React.createElement(SearchBox, {
-        value: c,
-        onChange: m,
-        placeholder: n("search_placeholder"),
-      }),
     ),
     React.createElement(
       Card,
@@ -6541,68 +6516,40 @@ function LedgerPage({ ctx: o }) {
       title: e("ledger_title"),
       subtitle: e("ledger_subtitle"),
     }),
+    React.createElement("style", null, AN_CSS(BRAND)),
     React.createElement(
       "div",
-      {
-        style: {
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 10,
-          marginBottom: 18,
-          maxWidth: 360,
-        },
-      },
-      React.createElement(StatCard, {
-        label: e("ledger_total_income"),
-        value: fmtRp(s),
-        tone: "green",
-        icon: TrendingUp,
-        compact: !0,
-      }),
-      React.createElement(StatCard, {
-        label: e("ledger_total_expense"),
-        value: fmtRp(g),
-        tone: "gray",
-        icon: Receipt,
-        compact: !0,
-      }),
-      React.createElement(StatCard, {
-        label: e("ledger_balance"),
-        value: fmtRp(s - g),
-        tone: "blue",
-        icon: Wallet,
-        compact: !0,
-      }),
+      { className: "an-grid an-row3", style: { marginBottom: 24 } },
+      (() => {
+        const tx = window.__uiLang === "en" ? "transactions" : "transaksi";
+        return [
+          [e("ledger_total_income"), s, BRAND.green, `${m.length} ${tx}`],
+          [e("ledger_total_expense"), g, BRAND.ink, `${k.length} ${tx}`],
+          [e("ledger_balance"), s - g, s - g >= 0 ? BRAND.ink : BRAND.red, `${m.length + k.length} ${tx}`],
+        ];
+      })().map(([lb, val, col, foot]) =>
+        React.createElement(
+          "div",
+          { className: "an-card", key: lb, style: { padding: "14px 16px" } },
+          React.createElement("h3", null, lb),
+          React.createElement("p", { className: "an-big", style: { color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, fmtRp(val)),
+          React.createElement("div", { className: "an-kpi-foot", style: { marginTop: 8 } }, React.createElement("span", null, foot)),
+        ),
+      ),
     ),
     React.createElement(
-      Card,
-      {
-        style: {
-          marginBottom: 14,
-          padding: 12,
-          display: "flex",
-          gap: 10,
-          flexWrap: "wrap",
-        },
-      },
-      React.createElement(SearchBox, {
-        value: l,
-        onChange: p,
-        placeholder: e("search_placeholder"),
-      }),
+      "div",
+      { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
+      React.createElement("div", { style: { width: 240 } }, React.createElement(SearchBox, { value: l, onChange: p, placeholder: e("search_placeholder") })),
       React.createElement(
-        UiSelect,
-        {
-          style: { ...inputStyle, width: 150 },
-          value: d,
-          onChange: (i) => f(i.target.value),
-        },
-        React.createElement("option", { value: "All" }, e("ledger_all_types")),
-        React.createElement("option", { value: "Income" }, e("ledger_income")),
+        "div",
+        { style: { width: 180 } },
         React.createElement(
-          "option",
-          { value: "Expense" },
-          e("ledger_expense"),
+          UiSelect,
+          { style: { ...inputStyle, height: 38 }, value: d, onChange: (i) => f(i.target.value) },
+          React.createElement("option", { value: "All" }, e("ledger_all_types")),
+          React.createElement("option", { value: "Income" }, e("ledger_income")),
+          React.createElement("option", { value: "Expense" }, e("ledger_expense")),
         ),
       ),
     ),
@@ -6613,7 +6560,7 @@ function LedgerPage({ ctx: o }) {
         ? React.createElement(EmptyState, { text: e("ledger_empty") })
         : React.createElement(
             Table,
-            null,
+            { fit: !1 },
             React.createElement(
               TableHeader,
               null,
@@ -6703,6 +6650,7 @@ function marginTone(o) {
 function MarginPage({ ctx: o }) {
   const { invoices: a, expenses: t, t: r } = o,
     [n, e] = useState(""),
+    [mf, setMf] = useState("all"),
     [l, p] = useState({ key: "profit", dir: "desc" }),
     d = a.map((m) => {
       const k = (m.payments || [])
@@ -6724,9 +6672,7 @@ function MarginPage({ ctx: o }) {
       };
     }),
     f = sortRows(
-      d.filter((m) =>
-        JSON.stringify(m).toLowerCase().includes(n.toLowerCase()),
-      ),
+      d.filter((m) => (mf === "all" || marginTone(m.margin) === { good: "green", mid: "amber", low: "red" }[mf]) && JSON.stringify(m).toLowerCase().includes(n.toLowerCase())),
       l,
     ),
     v = d.reduce((m, k) => m + k.revenue, 0),
@@ -6740,48 +6686,33 @@ function MarginPage({ ctx: o }) {
       title: r("margin_title"),
       subtitle: r("margin_subtitle"),
     }),
+    React.createElement("style", null, AN_CSS(BRAND)),
     React.createElement(
       "div",
-      {
-        style: {
-          display: "grid",
-          gridTemplateColumns: "1fr",
-          gap: 10,
-          marginBottom: 18,
-          maxWidth: 360,
-        },
-      },
-      React.createElement(StatCard, {
-        label: r("margin_total_revenue"),
-        value: fmtRp(v),
-        tone: "blue",
-        icon: TrendingUp,
-        compact: !0,
-      }),
-      React.createElement(StatCard, {
-        label: r("margin_total_expense"),
-        value: fmtRp(u),
-        tone: "gray",
-        icon: Receipt,
-        compact: !0,
-      }),
-      React.createElement(StatCard, {
-        label: r("margin_total_profit"),
-        value: fmtRp(y),
-        tone: v > 0 ? marginTone(c) : y >= 0 ? "green" : "red",
-        icon: BarChart3,
-        sublabel: v > 0 ? `Margin ${c.toFixed(1)}%` : void 0,
-        compact: !0,
-      }),
+      { className: "an-grid an-row3", style: { marginBottom: 24 } },
+      [
+        [r("margin_total_revenue"), v, BRAND.ink, `${d.length} invoice`],
+        [r("margin_total_expense"), u, BRAND.ink, `${d.length} invoice`],
+        [r("margin_total_profit"), y, v > 0 ? BRAND[marginTone(c)] : y >= 0 ? BRAND.green : BRAND.red, v > 0 ? `Margin ${c.toFixed(1)}%` : "Margin —"],
+      ].map(([lb, val, col, foot]) =>
+        React.createElement(
+          "div",
+          { className: "an-card", key: lb, style: { padding: "14px 16px" } },
+          React.createElement("h3", null, lb),
+          React.createElement("p", { className: "an-big", style: { color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, fmtRp(val)),
+          React.createElement("div", { className: "an-kpi-foot", style: { marginTop: 8 } }, React.createElement("span", null, foot)),
+        ),
+      ),
     ),
     React.createElement(
-      Card,
-      { style: { marginBottom: 14, padding: 12 } },
-      React.createElement(SearchBox, {
-        value: n,
-        onChange: e,
-        placeholder: r("search_placeholder"),
-      }),
+      "div",
+      { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
+      React.createElement("div", { style: { width: 240 } }, React.createElement(SearchBox, { value: n, onChange: e, placeholder: r("search_placeholder") })),
+      React.createElement(
+        "div",
+        { style: { width: 180 } },
+        React.createElement(UiSelect, { style: { ...inputStyle, height: 38 }, value: mf, onChange: (x) => setMf(x.target.value) }, ["all", "good", "mid", "low"].map((k) => React.createElement("option", { key: k, value: k }, r("margin_f_" + k)))),
+      ),
     ),
     React.createElement(
       Card,
@@ -6790,7 +6721,7 @@ function MarginPage({ ctx: o }) {
         ? React.createElement(EmptyState, { text: r("margin_empty") })
         : React.createElement(
             Table,
-            null,
+            { fit: !1 },
             React.createElement(
               TableHeader,
               null,
