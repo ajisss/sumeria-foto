@@ -1,0 +1,5 @@
+tests
+payhub
+PayHub-38.html
+.env*
+!.env.example
