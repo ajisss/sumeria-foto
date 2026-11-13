@@ -477,6 +477,17 @@ function LegacyImportBanner({ items, ctx, onDone }) {
 
 /* ---------- Akun sendiri: ganti nama & password ---------- */
 
+function PwField({ label, value, onChange, autoComplete }) {
+  const h = React.createElement;
+  const [show, setShow] = useState(false);
+  const txt = show ? "Sembunyikan password" : "Tampilkan password";
+  return h(Field, { label },
+    h("div", { style: { position: "relative" } },
+      h("input", { type: show ? "text" : "password", value, onChange, autoComplete, style: { ...inputStyle, paddingRight: 40 } }),
+      h("button", { type: "button", onClick: () => setShow(!show), "aria-label": txt, title: txt, "aria-pressed": show, style: { position: "absolute", top: 0, right: 0, height: "100%", width: 38, background: "none", border: "none", color: BRAND.inkSoft, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" } },
+        authIcon(show ? "eyeOff" : "eye", 17))));
+}
+
 function AccountPanel({ me, showToast }) {
   const h = React.createElement;
   const [name, setName] = useState(me.user.name || "");
@@ -485,9 +496,6 @@ function AccountPanel({ me, showToast }) {
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
-
-  const label = (t) => h("label", { style: { display: "block", fontSize: 12.5, fontWeight: 500, color: BRAND.ink, marginBottom: 6 } }, t);
-  const field = (props) => h("input", { ...props, style: { ...inputStyle, marginBottom: 12 } });
 
   async function saveName(e) {
     e.preventDefault();
@@ -520,19 +528,24 @@ function AccountPanel({ me, showToast }) {
     setBusy("");
   }
 
-  return h("div", { style: { marginBottom: 16, paddingBottom: 16, borderBottom: `1px solid ${BRAND.line}` } },
-    h("p", { style: { margin: "0 0 12px", fontSize: 12, color: BRAND.inkSoft } }, `${me.user.email} · ${ROLE_LABEL[me.user.role] || me.user.role}`),
-    h("form", { onSubmit: saveName, style: { marginBottom: 14 } },
-      label("Nama"),
-      field({ value: name, maxLength: 100, onChange: (e) => setName(e.target.value), autoComplete: "name" }),
-      h(Button, { type: "submit", size: "sm", variant: "secondary", disabled: busy === "name" }, "Simpan nama")),
-    h("form", { onSubmit: savePassword },
-      label("Password saat ini"),
-      field({ type: "password", value: cur, onChange: (e) => setCur(e.target.value), autoComplete: "current-password" }),
-      label("Password baru (min. 10 karakter)"),
-      field({ type: "password", value: pw, onChange: (e) => setPw(e.target.value), autoComplete: "new-password" }),
-      label("Ulangi password baru"),
-      field({ type: "password", value: pw2, onChange: (e) => setPw2(e.target.value), autoComplete: "new-password" }),
-      err && h("p", { role: "alert", style: { margin: "0 0 10px", fontSize: 12.5, color: BRAND.red } }, err),
-      h(Button, { type: "submit", size: "sm", variant: "secondary", disabled: busy === "pw" || !cur || !pw }, busy === "pw" ? "Menyimpan…" : "Ganti password")));
+  const section = (title, sub, ...kids) =>
+    h("section", null,
+      h("h4", { style: { margin: 0, fontSize: 14, fontWeight: 600, color: BRAND.ink } }, title),
+      h("p", { style: { margin: "2px 0 14px", fontSize: 12.5, color: BRAND.inkSoft } }, sub),
+      ...kids);
+  return h("div", null,
+    section("Informasi profil", "Nama yang tampil di aplikasi dan riwayat aktivitas.",
+      h("form", { onSubmit: saveName },
+        h(Field, { label: "Nama" }, h("input", { style: inputStyle, value: name, maxLength: 100, onChange: (e) => setName(e.target.value), autoComplete: "name" })),
+        h("div", { style: { display: "flex", justifyContent: "flex-end" } },
+          h(Button, { type: "submit", icon: Save, disabled: busy === "name" || !name.trim() || name.trim() === me.user.name }, busy === "name" ? "Menyimpan…" : "Simpan nama")))),
+    h("div", { style: { height: 24 } }),
+    section("Ganti password", "Setelah diganti, sesi di perangkat lain akan keluar otomatis.",
+      h("form", { onSubmit: savePassword },
+        h(PwField, { label: "Password saat ini", value: cur, onChange: (e) => setCur(e.target.value), autoComplete: "current-password" }),
+        h(PwField, { label: "Password baru (min. 10 karakter)", value: pw, onChange: (e) => setPw(e.target.value), autoComplete: "new-password" }),
+        h(PwField, { label: "Ulangi password baru", value: pw2, onChange: (e) => setPw2(e.target.value), autoComplete: "new-password" }),
+        err && h("p", { role: "alert", style: { margin: "0 0 10px", fontSize: 12.5, color: BRAND.red } }, err),
+        h("div", { style: { display: "flex", justifyContent: "flex-end" } },
+          h(Button, { type: "submit", icon: Lock, disabled: busy === "pw" || !cur || !pw }, busy === "pw" ? "Menyimpan…" : "Ganti password")))));
 }

@@ -509,7 +509,7 @@ function AppHeader({ ctx, tab, dark, toggleTheme, lang, changeLang, onProfile, o
           h(
             "div",
             { className: "hd-pop", role: "menu", style: { minWidth: 260 } },
-            h("div", { className: "hd-who" }, h("span", { className: "hd-avatar" }, initials), h("div", { style: { minWidth: 0 } }, h("b", null, name), h("span", null, email), user.role && h("span", null, D["role_" + user.role] || user.role))),
+            h("div", { className: "hd-who" }, h("span", { className: "hd-avatar" }, initials), h("div", { style: { minWidth: 0 } }, h("b", null, name), user.role && h("span", null, D["role_" + user.role] || user.role))),
             h("button", { className: "hd-item", role: "menuitem", onClick: go(onProfile) }, hdIcon("user", 16), D.profile),
             h("button", { className: "hd-item", role: "menuitem", onClick: go(onBackup) }, hdIcon("save", 16), D.backup),
             h("button", { className: "hd-item danger", role: "menuitem", onClick: go(onLogout) }, hdIcon("logout", 16), ctx.t("logout")),

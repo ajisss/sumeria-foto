@@ -638,6 +638,7 @@ const Search = makeIcon(
       pkg_title: "Package Item",
       pkg_subtitle: "Katalog paket beserta harga default, dan laporan penjualan per paket.",
       pkg_tab_catalog: "Katalog",
+      pkg_add_to_catalog: "Tambah ke katalog",
       pkg_tab_best: "Best Sellers",
       pkg_add: "Tambah paket",
       pkg_search: "Cari paket...",
@@ -666,6 +667,9 @@ const Search = makeIcon(
       close: "Tutup",
       search_placeholder: "Cari...",
       logout: "Keluar",
+      profile_sub: "Kelola nama dan password akunmu.",
+      logout_title: "Keluar dari akun?",
+      logout_msg: "Kamu akan keluar dari PayHub dan perlu login lagi untuk melanjutkan.",
       backup_restore: "Backup & Restore",
       dark_mode: "Mode gelap",
       light_mode: "Mode terang",
@@ -1027,6 +1031,7 @@ const Search = makeIcon(
       pkg_title: "Package Item",
       pkg_subtitle: "Package catalog with default prices, plus sales reports per package.",
       pkg_tab_catalog: "Catalog",
+      pkg_add_to_catalog: "Add to catalog",
       pkg_tab_best: "Best Sellers",
       pkg_add: "Add package",
       pkg_search: "Search packages...",
@@ -1055,6 +1060,9 @@ const Search = makeIcon(
       close: "Close",
       search_placeholder: "Search...",
       logout: "Log out",
+      profile_sub: "Manage your name and account password.",
+      logout_title: "Log out of your account?",
+      logout_msg: "You will be signed out of PayHub and need to sign in again to continue.",
       backup_restore: "Backup & Restore",
       dark_mode: "Dark mode",
       light_mode: "Light mode",
@@ -2018,6 +2026,7 @@ function MainApp({
   changeLang: e,
   t: l,
 }) {
+  const [askOut, setAskOut] = useState(!1);
   const perms = ME.permissions || [],
     can = (x) => perms.includes(x),
     collHooks = (name) => ({
@@ -2191,7 +2200,7 @@ function MainApp({
       tab: I,
       setTab: s,
       email: o,
-      onLogout: a,
+      onLogout: () => setAskOut(!0),
       currentLabel: j,
       dark: t,
       toggleTheme: r,
@@ -2214,8 +2223,10 @@ function MainApp({
         changeLang: e,
         onProfile: () => setPR(!0),
         onBackup: () => setBK(!0),
-        onLogout: a,
+        onLogout: () => setAskOut(!0),
       }),
+    askOut &&
+      React.createElement(ConfirmModal, { title: l("logout_title"), message: l("logout_msg"), confirmLabel: l("logout"), confirmIcon: LogOut, onConfirm: () => { setAskOut(!1); a(); }, onCancel: () => setAskOut(!1), t: l }),
     React.createElement(
       "main",
       {
@@ -2223,7 +2234,7 @@ function MainApp({
         style: {
           flex: 1,
           minWidth: 0,
-          padding: "28px 32px 60px",
+          padding: "28px 32px 32px",
           maxWidth: 1280,
           margin: "0 auto",
           width: "100%",
@@ -2252,7 +2263,7 @@ function MainApp({
     PR &&
       React.createElement(
         Modal,
-        { title: "Profile", onClose: () => setPR(!1), width: 420, icon: UserCircle },
+        { title: "Profile", subtitle: l("profile_sub"), onClose: () => setPR(!1), width: 460, icon: UserCircle },
         React.createElement(
           "div",
           {
@@ -2261,16 +2272,14 @@ function MainApp({
               alignItems: "center",
               gap: 12,
               marginBottom: 20,
-              paddingBottom: 18,
-              borderBottom: `1px solid ${BRAND.line}`,
             },
           },
           React.createElement(
             "div",
             {
               style: {
-                width: 46,
-                height: 46,
+                width: 72,
+                height: 72,
                 borderRadius: "50%",
                 background: BRAND.blueFaint,
                 border: `1px solid ${BRAND.line}`,
@@ -2300,80 +2309,11 @@ function MainApp({
             React.createElement(
               "div",
               { style: { fontSize: 11.5, color: BRAND.inkSoft, marginTop: 2 } },
-              "Sum\xE9riapoto PayHub",
+              ROLE_LABEL[ME.user.role] || ME.user.role,
             ),
           ),
         ),
         React.createElement(AccountPanel, { me: ME, showToast }),
-        React.createElement(
-          "button",
-          {
-            onClick: () => {
-              (setPR(!1), setBK(!0));
-            },
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              fontSize: 13.5,
-              color: BRAND.ink,
-              background: "transparent",
-              border: `1px solid ${BRAND.line}`,
-              borderRadius: 8,
-              padding: "11px 12px",
-              cursor: "pointer",
-              width: "100%",
-              marginBottom: 9,
-            },
-          },
-          React.createElement(Save, { size: 15 }),
-          "Backup & Restore",
-        ),
-        React.createElement(
-          "button",
-          {
-            onClick: r,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              fontSize: 13.5,
-              color: BRAND.ink,
-              background: "transparent",
-              border: `1px solid ${BRAND.line}`,
-              borderRadius: 8,
-              padding: "11px 12px",
-              cursor: "pointer",
-              width: "100%",
-              marginBottom: 16,
-            },
-          },
-          t
-            ? React.createElement(Sun, { size: 15 })
-            : React.createElement(Moon, { size: 15 }),
-          l(t ? "light_mode" : "dark_mode"),
-        ),
-        React.createElement(
-          "button",
-          {
-            onClick: a,
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 9,
-              fontSize: 13.5,
-              color: BRAND.red,
-              background: BRAND.redBg,
-              border: `1px solid ${BRAND.redBorder}`,
-              borderRadius: 8,
-              padding: "11px 12px",
-              cursor: "pointer",
-              width: "100%",
-            },
-          },
-          React.createElement(LogOut, { size: 15 }),
-          l("logout"),
-        ),
       ),
     BK &&
       React.createElement(BackupModal, { ctx: N, onClose: () => setBK(!1) }),
@@ -3442,7 +3382,7 @@ function Modal({ title: o, onClose: a, children: t, width: r = 640, icon: ic, su
     ),
   );
 }
-function ConfirmModal({ title: o, message: a, onConfirm: t, onCancel: r, t: n }) {
+function ConfirmModal({ title: o, message: a, onConfirm: t, onCancel: r, t: n, confirmLabel: cl, confirmIcon: ci, tone: tn = "danger" }) {
   const e = n || ((l) => ({ confirm_delete_title: "Konfirmasi hapus", cancel: "Cancel", delete: "Delete" })[l] || l);
   useEffect(() => {
     const k = (ev) => ev.key === "Escape" && r();
@@ -3465,7 +3405,7 @@ function ConfirmModal({ title: o, message: a, onConfirm: t, onCancel: r, t: n })
       React.createElement(
         "div",
         { className: "dlg-head" },
-        React.createElement(DlgIcon, { icon: AlertTriangle, tone: "danger" }),
+        React.createElement(DlgIcon, { icon: ci || AlertTriangle, tone: tn }),
         React.createElement("h3", { className: "dlg-title" }, o || e("confirm_delete_title")),
         React.createElement("p", { className: "dlg-sub" }, a),
       ),
@@ -3476,7 +3416,7 @@ function ConfirmModal({ title: o, message: a, onConfirm: t, onCancel: r, t: n })
           "div",
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
           React.createElement(Button, { icon: X, variant: "secondary", onClick: r }, e("cancel")),
-          React.createElement(Button, { icon: Trash2, variant: "primary", onClick: t }, e("delete")),
+          React.createElement(Button, { icon: ci || Trash2, variant: "primary", onClick: t }, cl || e("delete")),
         ),
       ),
     ),
@@ -6519,7 +6459,7 @@ function LedgerPage({ ctx: o }) {
     React.createElement("style", null, AN_CSS(BRAND)),
     React.createElement(
       "div",
-      { className: "an-grid an-row3", style: { marginBottom: 24 } },
+      { className: "an-grid an-row3", style: { marginBottom: 16 } },
       (() => {
         const tx = window.__uiLang === "en" ? "transactions" : "transaksi";
         return [
@@ -6533,7 +6473,6 @@ function LedgerPage({ ctx: o }) {
           { className: "an-card", key: lb, style: { padding: "14px 16px" } },
           React.createElement("h3", null, lb),
           React.createElement("p", { className: "an-big", style: { color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, fmtRp(val)),
-          React.createElement("div", { className: "an-kpi-foot", style: { marginTop: 8 } }, React.createElement("span", null, foot)),
         ),
       ),
     ),
@@ -6560,7 +6499,7 @@ function LedgerPage({ ctx: o }) {
         ? React.createElement(EmptyState, { text: e("ledger_empty") })
         : React.createElement(
             Table,
-            { fit: !1 },
+            null,
             React.createElement(
               TableHeader,
               null,
@@ -6689,18 +6628,17 @@ function MarginPage({ ctx: o }) {
     React.createElement("style", null, AN_CSS(BRAND)),
     React.createElement(
       "div",
-      { className: "an-grid an-row3", style: { marginBottom: 24 } },
+      { className: "an-grid an-row3", style: { marginBottom: 16 } },
       [
         [r("margin_total_revenue"), v, BRAND.ink, `${d.length} invoice`],
         [r("margin_total_expense"), u, BRAND.ink, `${d.length} invoice`],
-        [r("margin_total_profit"), y, v > 0 ? BRAND[marginTone(c)] : y >= 0 ? BRAND.green : BRAND.red, v > 0 ? `Margin ${c.toFixed(1)}%` : "Margin —"],
+        [r("margin_total_profit") + (v > 0 ? ` · Margin ${c.toFixed(1)}%` : ""), y, v > 0 ? BRAND[marginTone(c)] : y >= 0 ? BRAND.green : BRAND.red, v > 0 ? `Margin ${c.toFixed(1)}%` : "Margin —"],
       ].map(([lb, val, col, foot]) =>
         React.createElement(
           "div",
           { className: "an-card", key: lb, style: { padding: "14px 16px" } },
           React.createElement("h3", null, lb),
           React.createElement("p", { className: "an-big", style: { color: col, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, fmtRp(val)),
-          React.createElement("div", { className: "an-kpi-foot", style: { marginTop: 8 } }, React.createElement("span", null, foot)),
         ),
       ),
     ),
@@ -6721,7 +6659,7 @@ function MarginPage({ ctx: o }) {
         ? React.createElement(EmptyState, { text: r("margin_empty") })
         : React.createElement(
             Table,
-            { fit: !1 },
+            null,
             React.createElement(
               TableHeader,
               null,
@@ -6886,14 +6824,36 @@ function PackageModal({ pkg: o, all: all, onSave: r, onClose: n, t: e }) {
   );
 }
 function PackagesPage({ ctx: o }) {
-  const { packages: pk, setPackages: setPk, can, showToast: toast, t: e } = o,
+  const { packages: pk, setPackages: setPk, invoices: inv, can, showToast: toast, t: e } = o,
     h = React.createElement,
-    [tab, setTab] = useState("catalog"),
     [q, setQ] = useState(""),
+    [sort, setSort] = useState({ key: "revenue", dir: "desc" }),
     [edit, setEdit] = useState(null),
     [del, setDel] = useState(null),
     canW = can("write:packages"),
-    rows = [...(pk || [])].filter((x) => x.name.toLowerCase().includes(q.trim().toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+    stats = useMemo(() => {
+      const m = {};
+      (inv || []).forEach((d) =>
+        (d.items || []).forEach((f) => {
+          const k = f.packageItem || "";
+          if (!k) return;
+          const r = (m[k] = m[k] || { qty: 0, orders: 0, revenue: 0 });
+          r.qty += Number(f.qty) || 0;
+          r.orders += 1;
+          r.revenue += lineTotal(f);
+        }),
+      );
+      return m;
+    }, [inv]),
+    base = [
+      ...(pk || []).map((x) => ({ ...x, cat: !0 })),
+      ...Object.keys(stats).filter((k) => !(pk || []).some((x) => x.name === k)).map((k) => ({ id: "x-" + k, name: k, price: 0, cat: !1 })),
+    ].map((x) => ({ ...x, qty: stats[x.name]?.qty || 0, orders: stats[x.name]?.orders || 0, revenue: stats[x.name]?.revenue || 0 })),
+    rows = sortRows(
+      base.filter((x) => x.name.toLowerCase().includes(q.trim().toLowerCase())),
+      sort,
+    ),
+    maxRev = Math.max(1, ...base.map((x) => x.revenue));
   function save(v) {
     const isNew = !v.id;
     setPk((arr) => (isNew ? [...arr, { ...v, id: uid() }] : arr.map((x) => (x.id === v.id ? v : x))));
@@ -6911,180 +6871,77 @@ function PackagesPage({ ctx: o }) {
     h(PageHeader, {
       title: e("pkg_title"),
       subtitle: e("pkg_subtitle"),
-      search: tab === "catalog" ? h(SearchBox, { value: q, onChange: setQ, placeholder: e("pkg_search") }) : null,
-      action: tab === "catalog" && canW ? h(Button, { icon: Plus, onClick: () => setEdit({ name: "", price: 0 }) }, e("pkg_add")) : null,
+      search: h(SearchBox, { value: q, onChange: setQ, placeholder: e("pkg_search") }),
+      action: canW ? h(Button, { icon: Plus, onClick: () => setEdit({ name: "", price: 0 }) }, e("pkg_add")) : null,
     }),
     h(
-      "div",
-      { className: "ui-tabs", role: "tablist" },
-      [["catalog", e("pkg_tab_catalog"), (pk || []).length], ["best", e("pkg_tab_best"), null]].map(([k, label, cnt]) =>
-        h("button", { key: k, type: "button", role: "tab", "aria-selected": tab === k, className: "ui-tab" + (tab === k ? " on" : ""), onClick: () => setTab(k) }, label, cnt !== null && h("span", { className: "ui-tab-n" }, cnt)),
-      ),
-    ),
-    tab === "best" && h(BestsellersPage, { ctx: o, embedded: !0 }),
-    tab === "catalog" &&
-      h(
-        Card,
-        { style: { padding: 0, overflowX: "auto" } },
-        rows.length === 0
-          ? h(EmptyState, { text: e("pkg_empty") })
-          : h(
-              Table,
-              null,
-              h(TableHeader, null, h(TableRow, null, h(TableHead, { style: { width: 56 } }, e("item_no")), h(TableHead, null, e("pkg_col_name")), h(TableHead, null, e("pkg_col_price")), canW && h(TableHead, { style: { width: 100 } }))),
-              h(
-                TableBody,
-                null,
-                rows.map((x, i) =>
-                  h(
-                    TableRow,
-                    { key: x.id },
-                    h(TableCell, { style: { color: BRAND.inkSoft } }, i + 1),
-                    h(TableCell, { style: { fontWeight: 600 } }, x.name),
-                    h(TableCell, { style: { whiteSpace: "nowrap" } }, Number(x.price) > 0 ? fmtRp(x.price) : "—"),
-                    canW &&
-                      h(
-                        TableCell,
-                        null,
-                        h(
-                          "div",
-                          { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
-                          h(IconBtn, { icon: Pencil, title: e("edit"), onClick: () => setEdit(x) }),
-                          h(IconBtn, { icon: Trash2, title: e("delete"), tone: "danger", onClick: () => setDel(x) }),
-                        ),
-                      ),
-                  ),
-                ),
-              ),
-            ),
-      ),
-    edit && h(PackageModal, { pkg: edit, all: pk || [], onSave: save, onClose: () => setEdit(null), t: e }),
-    del && h(ConfirmModal, { message: `${e("pkg_delete_prefix")} "${del.name}" ${e("pkg_delete_confirm")}`, onConfirm: () => remove(del.id), onCancel: () => setDel(null), t: e }),
-  );
-}
-function BestsellersPage({ ctx: o, embedded: emb }) {
-  const { invoices: a, t } = o,
-    [r, n] = useState({ key: "revenue", dir: "desc" }),
-    e = {};
-  a.forEach((d) =>
-    (d.items || []).forEach((f) => {
-      const v = f.packageItem || "(Tanpa nama item)";
-      ((e[v] = e[v] || { packageItem: v, qty: 0, orders: 0, revenue: 0 }),
-        (e[v].qty += Number(f.qty) || 0),
-        (e[v].orders += 1),
-        (e[v].revenue += lineTotal(f)));
-    }),
-  );
-  const l = sortRows(Object.values(e), r),
-    p = Math.max(1, ...l.map((d) => d.revenue));
-  return React.createElement(
-    "div",
-    null,
-    !emb &&
-      React.createElement(PageHeader, {
-        title: t("best_title"),
-        subtitle: t("best_subtitle"),
-      }),
-    React.createElement(
       Card,
       { style: { padding: 0, overflowX: "auto" } },
-      l.length === 0
-        ? React.createElement(EmptyState, { text: t("best_empty") })
-        : React.createElement(
+      rows.length === 0
+        ? h(EmptyState, { text: e("pkg_empty") })
+        : h(
             Table,
             null,
-            React.createElement(
+            h(
               TableHeader,
               null,
-              React.createElement(
+              h(
                 TableRow,
                 null,
-                React.createElement(TableHead, { style: { width: 40 } }, "#"),
-                React.createElement(Th, {
-                  label: t("best_col_package"),
-                  sortKey: "packageItem",
-                  sort: r,
-                  setSort: n,
-                }),
-                React.createElement(Th, {
-                  label: t("best_col_qty"),
-                  sortKey: "qty",
-                  sort: r,
-                  setSort: n,
-                }),
-                React.createElement(Th, {
-                  label: t("best_col_orders"),
-                  sortKey: "orders",
-                  sort: r,
-                  setSort: n,
-                }),
-                React.createElement(Th, {
-                  label: t("best_col_revenue"),
-                  sortKey: "revenue",
-                  sort: r,
-                  setSort: n,
-                }),
-                React.createElement(
-                  TableHead,
-                  { style: { minWidth: 140 } },
-                  t("best_col_share"),
-                ),
+                h(TableHead, { style: { width: 56 } }, e("item_no")),
+                h(Th, { label: e("pkg_col_name"), sortKey: "name", sort, setSort }),
+                h(Th, { label: e("pkg_col_price"), sortKey: "price", sort, setSort }),
+                h(Th, { label: e("best_col_qty"), sortKey: "qty", sort, setSort }),
+                h(Th, { label: e("best_col_orders"), sortKey: "orders", sort, setSort }),
+                h(Th, { label: e("best_col_revenue"), sortKey: "revenue", sort, setSort }),
+                h(TableHead, { style: { minWidth: 120 } }, e("best_col_share")),
+                canW && h(TableHead, { style: { width: 100 } }),
               ),
             ),
-            React.createElement(
+            h(
               TableBody,
               null,
-              l.map((d, f) =>
-                React.createElement(
+              rows.map((x, i) =>
+                h(
                   TableRow,
-                  { key: d.packageItem },
-                  React.createElement(
-                    TableCell,
-                    { style: { color: BRAND.inkSoft } },
-                    f + 1,
-                  ),
-                  React.createElement(
-                    TableCell,
-                    { style: { fontWeight: 600 } },
-                    d.packageItem,
-                  ),
-                  React.createElement(TableCell, null, d.qty),
-                  React.createElement(TableCell, null, d.orders),
-                  React.createElement(
-                    TableCell,
-                    { style: { fontWeight: 700 } },
-                    fmtRp(d.revenue),
-                  ),
-                  React.createElement(
+                  { key: x.id },
+                  h(TableCell, { style: { color: BRAND.inkSoft } }, i + 1),
+                  h(TableCell, { style: { fontWeight: 600 } }, x.name),
+                  h(TableCell, { style: { whiteSpace: "nowrap" } }, Number(x.price) > 0 ? fmtRp(x.price) : "—"),
+                  h(TableCell, null, x.qty),
+                  h(TableCell, null, x.orders),
+                  h(TableCell, { style: { fontWeight: 600, whiteSpace: "nowrap" } }, fmtRp(x.revenue)),
+                  h(
                     TableCell,
                     null,
-                    React.createElement(
+                    h(
                       "div",
-                      {
-                        style: {
-                          flex: 1,
-                          height: 8,
-                          borderRadius: 4,
-                          background: BRAND.grayBg,
-                          overflow: "hidden",
-                          minWidth: 90,
-                        },
-                      },
-                      React.createElement("div", {
-                        style: {
-                          width: `${(d.revenue / p) * 100}%`,
-                          height: "100%",
-                          background: BRAND.blue,
-                          borderRadius: 4,
-                        },
-                      }),
+                      { style: { height: 8, borderRadius: 4, background: BRAND.grayBg, overflow: "hidden", minWidth: 90 } },
+                      h("div", { style: { width: `${(x.revenue / maxRev) * 100}%`, height: "100%", background: BRAND.blue, borderRadius: 4 } }),
                     ),
                   ),
+                  canW &&
+                    h(
+                      TableCell,
+                      null,
+                      h(
+                        "div",
+                        { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+                        x.cat
+                          ? [
+                              h(IconBtn, { key: "e", icon: Pencil, title: e("edit"), onClick: () => setEdit(x) }),
+                              h(IconBtn, { key: "d", icon: Trash2, title: e("delete"), tone: "danger", onClick: () => setDel(x) }),
+                            ]
+                          : h(IconBtn, { icon: Plus, title: e("pkg_add_to_catalog"), onClick: () => setEdit({ name: x.name, price: 0 }) }),
+                      ),
+                    ),
                 ),
               ),
             ),
           ),
     ),
+    edit && h(PackageModal, { pkg: edit, all: pk || [], onSave: save, onClose: () => setEdit(null), t: e }),
+    del && h(ConfirmModal, { message: `${e("pkg_delete_prefix")} "${del.name}" ${e("pkg_delete_confirm")}`, onConfirm: () => remove(del.id), onCancel: () => setDel(null), t: e }),
   );
 }
 function WatermarkPattern() {

@@ -28,7 +28,7 @@ const UI_CSS = `
   .ui-table .ui-th + .ui-th::before { content:""; position:absolute; left:0; top:11px; bottom:11px; width:1px; background:var(--c-line); }
   .ui-table .ui-tbody .ui-tr { transition:background-color .15s; }
   .ui-table .ui-tbody .ui-tr:hover { background:var(--c-grayBg); }
-  .ui-table .ui-td { padding:8px 14px; vertical-align:middle; font-size:13.5px; color:var(--c-ink); border-bottom:1px solid var(--c-line); }
+  .ui-table .ui-td { padding:13px 14px; vertical-align:middle; font-size:13.5px; color:var(--c-ink); border-bottom:1px solid var(--c-line); }
   .ui-table .ui-tbody .ui-tr:last-child .ui-td { border-bottom:none; }
   .ui-table [data-num] { text-align:right; font-variant-numeric:tabular-nums; }
   .ui-table input[type=number] { -moz-appearance:textfield; appearance:textfield; }
@@ -145,7 +145,8 @@ const UI_CSS = `
   .ui-phone-pop .ui-opt { gap:8px; }
   .ui-phone-pop .ck { width:22px; text-align:center; font-size:15px; }
   .ui-phone-none { padding:14px; text-align:center; color:var(--c-inkSoft); font-size:13px; }
-  .ui-tabs { display:flex; gap:4px; border-bottom:1px solid var(--c-line); margin-bottom:16px; overflow-x:auto; }
+  .ui-tabs { display:flex; gap:4px; border-bottom:1px solid var(--c-line); margin-bottom:16px; overflow-x:auto; scrollbar-width:none; }
+  .ui-tabs::-webkit-scrollbar { display:none; }
   .ui-tab { position:relative; display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 12px; border:none; background:none; color:var(--c-inkSoft); font:inherit; font-size:13.5px; font-weight:500; cursor:pointer; white-space:nowrap; }
   .ui-tab:hover { color:var(--c-ink); }
   .ui-tab.on { color:var(--c-ink); font-weight:600; }
