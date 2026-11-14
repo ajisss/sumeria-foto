@@ -418,7 +418,9 @@ function AppHeader({ ctx, tab, dark, toggleTheme, lang, changeLang, onProfile, o
   const unreadCount = notifs.filter((n) => !readIds.has(n.id)).length;
   const persistRead = (set) => {
     try {
-      localStorage.setItem("payhub-notif-read", JSON.stringify([...set].filter((id) => notifs.some((n) => n.id === id))));
+      const kept = [...set].filter((id) => notifs.some((n) => n.id === id));
+      localStorage.setItem("payhub-notif-read", JSON.stringify(kept));
+      Prefs.push({ notifRead: kept.slice(-500) });
     } catch (_) {}
   };
   const markRead = (id) =>

@@ -85,3 +85,10 @@ export const auditLog = pgTable("audit_log", {
   meta: jsonb("meta").$type<Record<string, unknown>>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => [index("audit_created_idx").on(t.createdAt)]);
+
+// Preferensi UI per user (bahasa, tema, sidebar, notifikasi yang sudah dibaca). Key divalidasi di routes/preferences.ts.
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

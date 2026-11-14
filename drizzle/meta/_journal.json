@@ -8,6 +8,13 @@
       "when": 1794056963066,
       "tag": "0000_easy_quicksilver",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794695547845,
+      "tag": "0001_needy_randall",
+      "breakpoints": true
     }
   ]
 }
