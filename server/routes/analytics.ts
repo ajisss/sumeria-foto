@@ -19,7 +19,10 @@ type Rec = Record<string, unknown>;
 type Payment = { amount?: unknown; paid?: unknown; paidDate?: unknown; dueDate?: unknown };
 type Item = { packageItem?: unknown; qty?: unknown; unitPrice?: unknown; discount?: unknown; eventDate?: unknown };
 
-const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const ymd = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((v) => !Number.isNaN(Date.parse(v + "T00:00:00Z")) && new Date(v + "T00:00:00Z").toISOString().slice(0, 10) === v, "Tanggal tidak valid");
 const query = z.object({
   start: ymd.optional(),
   end: ymd.optional(),
@@ -42,6 +45,8 @@ const fullyPaid = (inv: Rec) => {
 
 function addDays(d: string, n: number) {
   const t = new Date(d + "T00:00:00Z");
+  // Tanggal di data record bebas-format; jangan sampai satu record rusak menjatuhkan seluruh agregasi.
+  if (Number.isNaN(t.getTime())) return d;
   t.setUTCDate(t.getUTCDate() + n);
   return t.toISOString().slice(0, 10);
 }

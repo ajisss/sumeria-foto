@@ -96,6 +96,7 @@ function DesktopSidebar({ tab, setTab, can, overdueCount, t, lang, lastBackupAt,
     setCollapsed((c) => {
       try {
         localStorage.setItem("payhub-sidebar-collapsed", c ? "0" : "1");
+        if (typeof Prefs !== "undefined") Prefs.push({ sidebarCollapsed: !c });
       } catch (_) {}
       return !c;
     });

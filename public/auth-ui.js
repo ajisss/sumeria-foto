@@ -24,6 +24,49 @@ async function apiFetch(path, opts) {
   return data;
 }
 
+/* Preferensi UI per user (disimpan di server, /api/me/preferences). localStorage tetap jadi cache
+   supaya render awal instan; server menang saat pull setelah login/refresh. */
+const Prefs = (() => {
+  const LS = {
+    lang: ["payhub::payhub_lang", (v) => v, (v) => v],
+    theme: ["payhub::payhub_theme", (v) => v, (v) => v],
+    sidebarCollapsed: ["payhub-sidebar-collapsed", (v) => (v ? "1" : "0"), (v) => v === "1"],
+    notifRead: ["payhub-notif-read", (v) => JSON.stringify(v), (v) => JSON.parse(v)],
+  };
+  let pending = {};
+  let timer = null;
+  async function flush() {
+    timer = null;
+    const body = pending;
+    pending = {};
+    if (!Object.keys(body).length) return;
+    try {
+      await apiFetch("/api/me/preferences", { method: "PATCH", body });
+    } catch (_) {}
+  }
+  return {
+    /** Ambil dari server dan tulis ke cache lokal. Mengembalikan objek preferensi (atau {}). */
+    async pull() {
+      try {
+        const { preferences } = await apiFetch("/api/me/preferences");
+        for (const k of Object.keys(LS)) {
+          if (preferences[k] === undefined) continue;
+          try { localStorage.setItem(LS[k][0], LS[k][1](preferences[k])); } catch (_) {}
+        }
+        return preferences;
+      } catch (_) {
+        return {};
+      }
+    },
+    /** Simpan sebagian preferensi (debounce 400ms, merge di server). */
+    push(partial) {
+      Object.assign(pending, partial);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(flush, 400);
+    },
+  };
+})();
+
 const AUTH_STR = {
   id: {
     login_title: "Masuk ke akun kamu",

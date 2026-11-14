@@ -1916,7 +1916,9 @@ function App() {
   (useEffect(() => {
     ((async () => {
       try {
-        a(await apiFetch("/api/me"));
+        const me = await apiFetch("/api/me");
+        applyPrefs(await Prefs.pull());
+        a(me);
       } catch {
         a(!1);
       }
@@ -1948,17 +1950,25 @@ function App() {
       const B = !w;
       return (
         storage.set("payhub_theme", B ? "dark" : "light", !1).catch(() => {}),
+        Prefs.push({ theme: B ? "dark" : "light" }),
         B
       );
     });
   }
   function c(w) {
-    (p(w), storage.set("payhub_lang", w, !1).catch(() => {}));
+    (p(w), storage.set("payhub_lang", w, !1).catch(() => {}), Prefs.push({ lang: w }));
   }
   const m = makeT(l);
   window.__uiLang = l;
+  function applyPrefs(pf) {
+    if (pf.lang === "id" || pf.lang === "en") p(pf.lang);
+    if (pf.theme === "dark" || pf.theme === "light") r(pf.theme === "dark");
+  }
   function k(w) {
-    a(w);
+    Prefs.pull().then((pf) => {
+      applyPrefs(pf);
+      a(w);
+    });
   }
   function C() {
     apiFetch("/api/auth/sign-out", { method: "POST", body: {} })

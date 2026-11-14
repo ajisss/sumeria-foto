@@ -21,7 +21,9 @@ export const originGuard: MiddlewareHandler = async (c, next) => {
     if (origin && !trustedOrigins().has(origin)) throw new HTTPException(403, { message: "Origin tidak diizinkan" });
     if (!origin && c.req.header("sec-fetch-site") === "cross-site") throw new HTTPException(403, { message: "Origin tidak diizinkan" });
     const len = c.req.header("content-length");
-    if (len && len !== "0" && !(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+    // Body bisa ada tanpa Content-Length (chunked), jadi cek juga Transfer-Encoding.
+    const hasBody = (!!len && len !== "0") || !!c.req.header("transfer-encoding");
+    if (hasBody && !(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) {
       throw new HTTPException(415, { message: "Content-Type harus application/json" });
     }
   }
