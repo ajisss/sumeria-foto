@@ -1102,14 +1102,17 @@ const TG_STR = {
 const tgMonthLabel = (m, lang, long) => new Date(m + "-01T00:00:00").toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", { month: long ? "long" : "short", year: "numeric" });
 const tgPct = (p) => (p === null || p === undefined ? "—" : (Number.isInteger(p) ? p : p.toFixed(1)) + "%");
 
-function TgBar({ percent }) {
+// Warna bar target: tahunan = biru; bulanan = merah (<30%), kuning (30-<70%), hijau (>=70%).
+const TG_RED = "#D7191C", TG_YELLOW = "#FEE46E", TG_GREEN = "#1A9641";
+const tgColor = (percent, kind) => (kind === "year" ? "var(--an-1)" : (percent || 0) < 30 ? TG_RED : percent < 70 ? TG_YELLOW : TG_GREEN);
+
+function TgBar({ percent, kind }) {
   const h = React.createElement;
-  const done = percent >= 100;
   return h("div", { style: { height: 10, borderRadius: 6, background: BRAND.grayBg, border: `1px solid ${BRAND.line}`, overflow: "hidden", minWidth: 80 } },
-    h("div", { style: { width: Math.min(100, Math.max(0, percent || 0)) + "%", height: "100%", background: done ? "#1F7A4D" : "var(--an-1)", borderRadius: 6, transition: "width .3s" } }));
+    h("div", { style: { width: Math.min(100, Math.max(0, percent || 0)) + "%", height: "100%", background: tgColor(percent, kind), borderRadius: 6, transition: "width .3s, background .3s" } }));
 }
 
-function TgBlock({ label, percent, revenue, target, full, T }) {
+function TgBlock({ label, percent, revenue, target, full, kind, T }) {
   const h = React.createElement;
   const has = percent !== null && percent !== undefined;
   return h("div", { style: { minWidth: 0 } },
@@ -1117,7 +1120,7 @@ function TgBlock({ label, percent, revenue, target, full, T }) {
     has
       ? [
           h("p", { className: "an-big", key: "p", style: { margin: "0 0 2px" } }, tgPct(percent), h("span", { style: { fontSize: 13, fontWeight: 400, color: BRAND.inkSoft, marginLeft: 8 } }, T.achieved)),
-          h("div", { key: "b", style: { margin: "6px 0 8px" } }, h(TgBar, { percent })),
+          h("div", { key: "b", style: { margin: "6px 0 8px" } }, h(TgBar, { percent, kind })),
           full && h("div", { key: "n", style: { fontSize: 13, color: BRAND.inkSoft } }, fmtRp(revenue) + " " + T.of + " " + fmtRp(target)),
         ]
       : h("div", { style: { fontSize: 13.5, color: BRAND.inkSoft, padding: "10px 0" } }, T.none_period));
@@ -1147,8 +1150,8 @@ function TargetWidget({ month, refresh, canManage, setTab, lang }) {
           h("span", null, full ? T.none : T.none_admin),
           canManage && h(Button, { variant: "secondary", onClick: () => setTab("targets") }, T.set))
       : h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28, marginTop: 6 } },
-          h(TgBlock, { label: T.month_lbl + " · " + tgMonthLabel(d.month, lang, true), percent: d.percent, revenue: d.revenue, target: d.target, full, T }),
-          h(TgBlock, { label: T.year_lbl + " " + d.year.year, percent: d.year.percent, revenue: d.year.revenue, target: d.year.target, full, T })));
+          h(TgBlock, { label: T.month_lbl + " · " + tgMonthLabel(d.month, lang, true), percent: d.percent, revenue: d.revenue, target: d.target, full, kind: "month", T }),
+          h(TgBlock, { label: T.year_lbl + " " + d.year.year, percent: d.year.percent, revenue: d.year.revenue, target: d.year.target, full, kind: "year", T })));
 }
 
 function TargetsPage({ ctx }) {
@@ -1231,7 +1234,7 @@ function TargetsPage({ ctx }) {
         h("div", null, h("div", { style: { fontSize: 12, color: BRAND.inkSoft } }, T.real), h("div", { style: { fontWeight: 700, fontSize: 16 } }, fmtRp(yr.revenue))),
         h("div", { style: { minWidth: 170 } },
           h("div", { style: { fontSize: 12, color: BRAND.inkSoft, marginBottom: 4 } }, T.progress),
-          yr.target ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: yr.percent })), h("span", { style: { fontWeight: 700, minWidth: 48, textAlign: "right" } }, tgPct(yr.percent))) : "—"),
+          yr.target ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: yr.percent, kind: "year" })), h("span", { style: { fontWeight: 700, minWidth: 48, textAlign: "right" } }, tgPct(yr.percent))) : "—"),
         actions(String(year), yr.target))),
     data && h("h3", { style: { margin: "6px 0 10px", fontSize: 14, color: BRAND.inkSoft, fontWeight: 600 } }, T.monthly + " " + year),
     data && h(Card, { style: { padding: 0, overflowX: "auto" } }, h(Table, { paginate: false },
@@ -1243,7 +1246,7 @@ function TargetsPage({ ctx }) {
           h(TableCell, { style: { whiteSpace: "nowrap", color: m.target ? undefined : BRAND.inkSoft } }, m.target ? fmtRp(m.target) : T.empty),
           h(TableCell, { style: { whiteSpace: "nowrap" } }, fmtRp(m.revenue)),
           h(TableCell, null, m.target
-            ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: m.percent })), h("span", { style: { fontWeight: 600, minWidth: 48, textAlign: "right" } }, tgPct(m.percent)))
+            ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: m.percent, kind: "month" })), h("span", { style: { fontWeight: 600, minWidth: 48, textAlign: "right" } }, tgPct(m.percent)))
             : "—"),
           h(TableCell, null, actions(m.month, m.target)))),
         h(TableRow, { key: "sum" },
