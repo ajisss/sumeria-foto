@@ -5720,6 +5720,14 @@ function CalDayModal({ date: o, events: ev, onPick: pick, onClose: n, t: e }) {
     h("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, h(Button, { icon: X, variant: "secondary", onClick: n }, e("inv_close"))),
   );
 }
+/** Jam event ala Google Calendar: "9am", "4:15pm" (en) atau "09.00" (id). Teks non-jam dikembalikan apa adanya. */
+function fmtEvTime(tm, lang) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(tm || ""));
+  if (!m) return String(tm || "");
+  const H = Number(m[1]), M = Number(m[2]);
+  if (lang === "en") return (H % 12 || 12) + (M ? ":" + String(M).padStart(2, "0") : "") + (H >= 12 ? "pm" : "am");
+  return String(H).padStart(2, "0") + "." + String(M).padStart(2, "0");
+}
 function CalendarPage({ ctx: o }) {
   const { invoices: a, setInvoices: setInv, showToast: toast, t: n, lang: e } = o,
     h = React.createElement,
@@ -5769,8 +5777,8 @@ function CalendarPage({ ctx: o }) {
     }),
     title = first.toLocaleDateString(loc, { month: "long", year: "numeric" }),
     rangeTxt = `${fmtDate(ymd(first))} – ${fmtDate(ymd(new Date(p.y, p.m + 1, 0)))}`,
-    fits = Math.max(1, Math.floor((rowH - 37) / 25)),
-    fitsMore = Math.max(1, Math.floor((rowH - 37 - 19) / 25)),
+    fits = Math.max(1, Math.floor((rowH - 38) / 22)),
+    fitsMore = Math.max(1, Math.floor((rowH - 38 - 18) / 22)),
     shown = (cnt) => (window.innerWidth <= 700 ? 6 : cnt <= fits ? cnt : fitsMore),
     todayK = todayStr(),
     touchX = useRef(null),
@@ -5880,13 +5888,13 @@ function CalendarPage({ ctx: o }) {
           return h(
             "div",
             { key: x.key, className: "cal-cell" + (x.inMonth ? "" : " out") },
-            h("span", { className: "cal-d" + (x.key === todayK ? " today" : "") }, x.day),
+            h("span", { className: "cal-d" + (x.key === todayK ? " today" : "") }, x.day === 1 ? `${x.day} ${new Date(x.key + "T00:00:00").toLocaleDateString(loc, { month: "short" }).replace(".", "")}` : x.day),
             ev.slice(0, shown(ev.length)).map((g, i) =>
               h(
                 "button",
-                { key: i, type: "button", className: "cal-chip " + tone(g.status), onClick: () => setDetail({ id: g.invoiceId, date: x.key }), title: `${g.customer} — ${g.packageItem}${g.location ? " · " + g.location : ""}` },
+                { key: i, type: "button", className: "cal-chip " + tone(g.status) + (g.time ? " timed" : " allday"), onClick: () => setDetail({ id: g.invoiceId, date: x.key }), title: `${g.time ? fmtEvTime(g.time, e) + " " : ""}${g.customer} — ${g.packageItem}${g.location ? " · " + g.location : ""}` },
                 h("i", null),
-                h("span", { className: "cal-ct" }, g.time && h("em", null, g.time), h("b", null, g.customer), " ", g.packageItem),
+                h("span", { className: "cal-ct" }, g.time && h("em", null, fmtEvTime(g.time, e)), h("b", null, g.customer), g.packageItem && h("span", { className: "cal-pk" }, " " + g.packageItem)),
               ),
             ),
             ev.length > shown(ev.length) && h("button", { type: "button", className: "cal-more", onClick: () => setDayKey(x.key) }, `${ev.length - shown(ev.length)} ${n("cal_more")}`),
@@ -5916,23 +5924,27 @@ const CAL_CSS = `
   .cal-nav button + button { border-left:1px solid var(--c-line); }
   .cal-nav button:hover { background:var(--c-grayBg); }
   .cal-wk { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); border-bottom:1px solid var(--c-line); }
-  .cal-wk div { padding:9px 0; text-align:center; font-size:12.5px; color:var(--c-inkSoft); font-weight:500; }
+  .cal-wk div { padding:9px 0; text-align:center; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--c-inkSoft); font-weight:500; }
   .cal-grid { display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); flex:1; min-height:0; }
-  .cal-cell { display:flex; flex-direction:column; gap:3px; padding:5px 6px; border-right:1px solid var(--c-line); border-bottom:1px solid var(--c-line); min-height:0; overflow:hidden; }
+  .cal-cell { display:flex; flex-direction:column; gap:2px; padding:4px 5px; border-right:1px solid var(--c-line); border-bottom:1px solid var(--c-line); min-height:0; overflow:hidden; }
   .cal-cell:nth-child(7n) { border-right:none; }
   .cal-cell.out { background:var(--c-grayBg); }
   .cal-cell.out .cal-d { color:var(--c-inkSoft); }
-  .cal-d { align-self:flex-start; min-width:24px; height:24px; padding:0 6px; border-radius:7px; display:inline-flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:500; color:var(--c-ink); flex-shrink:0; }
-  .cal-d.today { background:var(--c-ink); color:var(--c-bg); font-weight:600; }
-  .cal-chip { display:flex; align-items:center; gap:5px; width:100%; min-width:0; height:22px; padding:0 6px; border:1px solid transparent; border-radius:6px; font:inherit; font-size:11.5px; text-align:left; cursor:pointer; flex-shrink:0; }
-  .cal-chip i { width:6px; height:6px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .cal-d { align-self:center; min-width:26px; height:26px; padding:0 7px; border-radius:13px; display:inline-flex; align-items:center; justify-content:center; font-size:12px; font-weight:500; color:var(--c-ink); flex-shrink:0; }
+  .cal-d.today { background:#2F65E0; color:#fff; font-weight:600; }
+  /* Gaya Google Calendar: event berjam = titik + jam + judul (tanpa latar); tanpa jam = batang berwarna penuh (all-day). */
+  .cal-chip { display:flex; align-items:center; gap:6px; width:100%; min-width:0; height:20px; padding:0 5px; border:none; border-radius:4px; background:transparent; color:var(--c-ink); font:inherit; font-size:11.5px; text-align:left; cursor:pointer; flex-shrink:0; }
+  .cal-chip i { width:8px; height:8px; border-radius:50%; background:var(--ev); flex-shrink:0; }
+  .cal-chip.g { --ev:#16A34A; } .cal-chip.a { --ev:#F59E0B; } .cal-chip.n { --ev:#2F65E0; }
   .cal-ct { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .cal-ct b { font-weight:600; }
-  .cal-ct em { font-style:normal; font-weight:700; margin-right:4px; opacity:.85; }
-  .cal-chip.g { background:var(--c-greenBg,#DCFCE7); color:var(--c-green,#15803D); border-color:rgba(22,163,74,.25); }
-  .cal-chip.a { background:var(--c-amberBg,#FEF3C7); color:var(--c-amber,#B45309); border-color:rgba(217,119,6,.25); }
-  .cal-chip.n { background:var(--c-grayBg); color:var(--c-ink); border-color:var(--c-line); }
-  .cal-chip:hover { filter:brightness(.96); }
+  .cal-ct em { font-style:normal; font-weight:500; margin-right:4px; color:var(--c-inkSoft); }
+  .cal-pk { font-weight:400; color:var(--c-inkSoft); }
+  .cal-chip.timed:hover { background:var(--c-grayBg); }
+  .cal-chip.allday { background:var(--ev); color:#fff; }
+  .cal-chip.allday i { display:none; }
+  .cal-chip.allday .cal-pk { color:rgba(255,255,255,.85); }
+  .cal-chip.allday:hover { filter:brightness(.93); }
   .cal-more { align-self:flex-start; border:none; background:none; padding:0 4px; font:inherit; font-size:11.5px; color:var(--c-inkSoft); cursor:pointer; }
   .cal-more:hover { color:var(--c-ink); text-decoration:underline; }
   .ev-box { border:1px solid var(--c-line); border-radius:10px; overflow:hidden; }
@@ -5957,7 +5969,7 @@ const CAL_CSS = `
     .cal-d { flex-basis:100%; }
     .cal-chip { width:10px; height:10px; padding:0; border-radius:50%; }
     .cal-chip i, .cal-ct { display:none; }
-    .cal-chip.g { background:var(--c-green,#15803D); } .cal-chip.a { background:var(--c-amber,#B45309); } .cal-chip.n { background:var(--c-inkSoft); }
+    .cal-chip { background:var(--ev); }
     .cal-more { font-size:10px; }
     .cal-range { display:none; }
   }
@@ -7676,9 +7688,17 @@ function PrintView({ target: o, onClose: a }) {
               textAlign: "center",
             },
           },
-          "Perumahan Taman Raya Citayam, Blok E4 No.02, Kecamatan Bojonggede, Bogor, Jawa Barat",
+          React.createElement("b", { style: { fontWeight: 600, color: BRAND.ink } }, "Royal Tajur Residence"),
           React.createElement("br", null),
-          "Phone 0813 4000 4073 \xB7 Instagram @Sumeriapoto",
+          "Jl. Raya Tajur No. 170, Pakuan, Bogor Selatan",
+          React.createElement("br", null),
+          "Cluster Avebury 9 No. 17",
+          React.createElement("br", null),
+          "Bogor, Jawa Barat",
+          React.createElement("br", null),
+          "Phone 0851 3939 8639 \xB7 0813 4000 4073 \xB7 Instagram @Sumeriapoto",
+          React.createElement("br", null),
+          React.createElement("span", { style: { fontSize: 9.5, letterSpacing: "0.03em", color: BRAND.inkSoft, opacity: 0.75, display: "inline-block", marginTop: 8 } }, "Created by Sumeriapoto Payhub"),
         ),
       ),
     )
