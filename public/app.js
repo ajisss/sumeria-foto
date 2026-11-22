@@ -4454,6 +4454,41 @@ function blankDoc() {
     items: [],
   };
 }
+/* Revisi quotation diteruskan ke invoice yang dibuat darinya (invoice.sourceQuotationId).
+   Yang disalin: item dan customer. Cicilan yang belum dibayar dihitung ulang dari total baru (proporsional ke persen
+   masing-masing); cicilan yang sudah dibayar tidak diubah. Invoice yang sudah lunas dilewati karena dokumen itu sudah selesai. */
+function quotationSyncKey(q) {
+  return JSON.stringify([(q.items || []).map(({ id, ...rest }) => rest), q.customerId || "", q.customerSnap || null]);
+}
+function repriceInvoicePayments(inv, total, items) {
+  const ps = inv.payments || [];
+  if (ps.length === 0) return generatePayments(inv.paymentPlan || "2x", total, { date: inv.date, items });
+  const paidSum = ps.filter((p) => p.paid).reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const unpaid = ps.filter((p) => !p.paid);
+  const pctSum = unpaid.reduce((s, p) => s + (Number(p.percent) || 0), 0) || 1;
+  const rest = Math.max(0, total - paidSum);
+  const amounts = unpaid.map((p) => Math.round((rest * (Number(p.percent) || 0)) / pctSum));
+  if (amounts.length) amounts[amounts.length - 1] += rest - amounts.reduce((s, x) => s + x, 0);
+  let k = 0;
+  return ps.map((p) => (p.paid ? p : { ...p, amount: amounts[k++] }));
+}
+function syncInvoicesFromQuotation(q, invoices) {
+  const linked = (invoices || []).filter((inv) => inv.sourceQuotationId === q.id);
+  const done = linked.filter((inv) => isFullyPaid(inv));
+  const target = new Map();
+  linked.filter((inv) => !isFullyPaid(inv)).forEach((inv) => {
+    const items = (q.items || []).map((x) => ({ ...x, id: uid() }));
+    target.set(inv.id, {
+      ...inv,
+      customerId: q.customerId,
+      customerSnap: q.customerSnap,
+      items,
+      payments: repriceInvoicePayments(inv, docSubtotal(items), items),
+      lastUpdated: todayStr(),
+    });
+  });
+  return { apply: (list) => list.map((inv) => target.get(inv.id) || inv), updated: target.size, skipped: done.length };
+}
 function QuotationsPage({ ctx: o }) {
   const {
       quotations: a,
@@ -4490,13 +4525,24 @@ function QuotationsPage({ ctx: o }) {
   }
   function I(i) {
     const S = !i.id;
+    // Quotation yang direvisi: teruskan perubahan item/customer ke invoice turunannya.
+    const prev = S ? null : a.find((b) => b.id === i.id);
+    const sync = prev && quotationSyncKey(prev) !== quotationSyncKey(i) ? syncInvoicesFromQuotation(i, n) : null;
     (t((h) =>
       i.id
         ? h.map((b) => (b.id === i.id ? i : b))
         : [...h, { ...i, id: uid() }],
     ),
+      sync && sync.updated > 0 && e(sync.apply),
       m(null),
-      hh && hh(S ? "Quotation created ✓" : "Quotation updated ✓"));
+      hh &&
+        hh(
+          S
+            ? "Quotation created ✓"
+            : "Quotation updated ✓" +
+                (sync && sync.updated ? ` · ${sync.updated} invoice ikut diperbarui` : "") +
+                (sync && sync.skipped ? ` · ${sync.skipped} invoice lunas tidak diubah` : ""),
+        ));
   }
   function s(i) {
     (t((h) => h.filter((b) => b.id !== i)),
