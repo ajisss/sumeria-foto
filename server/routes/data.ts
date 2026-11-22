@@ -48,12 +48,20 @@ dataRoutes.get("/:key", async (c) => {
   c.header("Cache-Control", "no-store");
   const rev = await revOf(key);
   if (c.req.query("rev") === rev) return c.json({ unchanged: true, rev });
+  // PIC customer = user yang pertama kali menginput (kolom created_by, diisi server, tidak bisa dipalsukan klien).
+  // Nama diambil saat dibaca supaya selalu terkini. Hanya untuk customers; tidak masuk ke snapshot/PDF.
   const rows = await db()
-    .select({ id: R.id, version: R.version, data: R.data })
+    .select({ id: R.id, version: R.version, data: R.data, picId: R.createdBy, picName: schema.user.name })
     .from(R)
+    .leftJoin(schema.user, eq(schema.user.id, R.createdBy))
     .where(eq(R.collection, key))
     .orderBy(asc(R.seq));
-  return c.json({ rev, records: rows });
+  const records = rows.map(({ id, version, data, picId, picName }) => ({
+    id,
+    version,
+    data: key === "customers" ? { ...data, pic: picId ? { id: picId, name: picName ?? "" } : null } : data,
+  }));
+  return c.json({ rev, records });
 });
 
 type Result = { id: string; ok: boolean; version?: number; conflict?: boolean };
@@ -69,6 +77,15 @@ dataRoutes.post(
     const parsed = syncBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) throw new HTTPException(400, { message: "Format data tidak valid" });
     const { changes } = parsed.data;
+    // `pic` selalu dihitung server dari created_by; abaikan kiriman klien supaya tidak tersimpan/dipalsukan.
+    if (key === "customers") {
+      for (const ch of changes) {
+        if (ch.op === "upsert" && "pic" in ch.data) {
+          const { pic: _pic, ...rest } = ch.data;
+          ch.data = rest;
+        }
+      }
+    }
 
     for (const ch of changes) {
       if (ch.op === "upsert" && Buffer.byteLength(JSON.stringify(ch.data)) > MAX_RECORD_BYTES) {

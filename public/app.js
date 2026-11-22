@@ -744,6 +744,7 @@ const Search = makeIcon(
       cust_col_email: "Email",
       cust_col_phone: "Phone",
       cust_col_city: "Kota",
+      cust_col_pic: "PIC",
       cust_modal_add: "Add customer",
       cust_modal_edit: "Edit customer",
       cust_modal_add_sub: "Tambahkan pelanggan baru untuk dipakai di quotation dan invoice.",
@@ -1138,6 +1139,7 @@ const Search = makeIcon(
       cust_col_email: "Email",
       cust_col_phone: "Phone",
       cust_col_city: "City",
+      cust_col_pic: "PIC",
       cust_modal_add: "Add customer",
       cust_modal_edit: "Edit customer",
       cust_modal_add_sub: "Add a new customer to use in quotations and invoices.",
@@ -3770,18 +3772,20 @@ function CustomersPage({ ctx: o }) {
     [y, c] = useState(null),
     [m, k] = useState(!1),
     C = sortRows(
-      a.filter((I) =>
-        JSON.stringify(I).toLowerCase().includes(l.toLowerCase()),
-      ),
+      a
+        .map((I) => ({ ...I, picName: (I.pic && I.pic.name) || "" }))
+        .filter((I) => JSON.stringify(I).toLowerCase().includes(l.toLowerCase())),
       d,
     ),
     P = a.find((I) => I.id === r);
   function w(I) {
     const S = !I.id;
+    // PIC = user yang menginput. Server menetapkannya dari created_by; di sini hanya agar langsung tampil sebelum sinkron.
+    const { picName: _pn, ...clean } = I;
     (t((s) =>
       I.id
-        ? s.map((g) => (g.id === I.id ? I : g))
-        : [...s, { ...I, id: uid() }],
+        ? s.map((g) => (g.id === I.id ? clean : g))
+        : [...s, { ...clean, id: uid(), pic: o.me && o.me.user ? { id: o.me.user.id, name: o.me.user.name } : null }],
     ),
       u(null),
       h && h(S ? "Customer added ✓" : "Customer updated ✓"));
@@ -3866,6 +3870,12 @@ function CustomersPage({ ctx: o }) {
                   sort: d,
                   setSort: f,
                 }),
+                React.createElement(Th, {
+                  label: e("cust_col_pic"),
+                  sortKey: "picName",
+                  sort: d,
+                  setSort: f,
+                }),
                 React.createElement(TableHead, { style: { width: 130 } }),
               ),
             ),
@@ -3882,6 +3892,7 @@ function CustomersPage({ ctx: o }) {
                   React.createElement(TableCell, null, I.email),
                   React.createElement(TableCell, null, I.phone),
                   React.createElement(TableCell, null, I.city),
+                  React.createElement(TableCell, { style: { color: I.picName ? BRAND.ink : BRAND.inkSoft } }, I.picName || "\u2014"),
                   React.createElement(
                     TableCell,
                     null,
@@ -7673,284 +7684,6 @@ function PrintView({ target: o, onClose: a }) {
     )
   );
 }
-function addWatermarks(o) {
-  try {
-    const a = o.internal.getNumberOfPages(),
-      t = o.internal.pageSize.getWidth(),
-      r = o.internal.pageSize.getHeight(),
-      n = 5,
-      e = 7,
-      l = 95,
-      p = l / LOGO_ASPECT;
-    for (let d = 1; d <= a; d++) {
-      (o.setPage(d),
-        o.saveGraphicsState(),
-        o.setGState(new o.GState({ opacity: 0.05 })));
-      for (let f = 0; f < e; f++)
-        for (let v = 0; v < n; v++) {
-          const u = ((v + 0.5) / n) * t,
-            y = ((f + 0.5) / e) * r;
-          o.addImage(
-            LOGO_DATA_URI,
-            "PNG",
-            u - l / 2,
-            y - p / 2,
-            l,
-            p,
-            void 0,
-            "FAST",
-            -25,
-          );
-        }
-      o.restoreGraphicsState();
-    }
-  } catch (a) {
-    console.error("watermark failed", a);
-  }
-}
-function addPaidFullStamp(o) {
-  try {
-    const w = o.internal.pageSize.getWidth();
-    (o.setPage(1),
-      o.saveGraphicsState(),
-      o.setGState(new o.GState({ opacity: 0.85 })));
-    const cx = w - 98,
-      cy = 120,
-      rOuter = 46,
-      rInner = 38;
-    (o.setDrawColor(31, 122, 77),
-      o.setLineWidth(2.4),
-      o.circle(cx, cy, rOuter, "S"),
-      o.setLineWidth(0.9),
-      o.circle(cx, cy, rInner, "S"),
-      o.setFont("helvetica", "bold"),
-      o.setFontSize(13),
-      o.setTextColor(31, 122, 77),
-      o.text("PAID", cx, cy - 4, { align: "center", angle: -14 }),
-      o.text("FULL", cx, cy + 12, { align: "center", angle: -14 }),
-      o.setFontSize(6),
-      o.text("SUMERIAPOTO", cx, cy + 25, { align: "center", angle: -14 }),
-      o.restoreGraphicsState());
-  } catch (a) {
-    console.error("paid stamp failed", a);
-  }
-}
-function buildInvoicePdf(o) {
-  if (typeof window.jspdf > "u") throw new Error("jsPDF not loaded");
-  const a = window.jspdf.jsPDF,
-    t = new a({ unit: "pt", format: "a4" }),
-    r = t.internal.pageSize.getWidth(),
-    ph = t.internal.pageSize.getHeight(),
-    n = 48;
-  let e = 64;
-  const l = 210,
-    p = l / LOGO_ASPECT;
-  try {
-    t.addImage(LOGO_DATA_URI, "PNG", n, e - p, l, p);
-  } catch (u) {
-    console.error("logo embed failed", u);
-  }
-  const logoBottom = e;
-  (t.setFont("helvetica", "normal"),
-    t.setFontSize(8.5),
-    t.setTextColor(120, 120, 120),
-    t.text("PHOTOGRAPHY & VIDEOGRAPHY", n, logoBottom + 13),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(17),
-    t.setTextColor(20, 20, 20),
-    t.text("INVOICE", r - n, e - p + 16, { align: "right" }),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(10),
-    t.setTextColor(100, 100, 100),
-    t.text(o.invNumber || "", r - n, e - p + 33, { align: "right" }),
-    t.text(fmtDatePdf(o.date), r - n, e - p + 47, { align: "right" }),
-    (e = logoBottom + 13 + 22),
-    t.setDrawColor(228, 231, 235),
-    t.line(n, e, r - n, e),
-    (e += 26),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(9.5),
-    t.setTextColor(20, 20, 20),
-    t.text("BILL TO", n, e),
-    t.setTextColor(30, 58, 95),
-    t.text("Status: " + currentStatus(o), r - n, e, { align: "right" }),
-    (e += 16),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(10),
-    t.setTextColor(30, 30, 30),
-    t.text(String((o.customerSnap && o.customerSnap.name) || ""), n, e),
-    (e += 14),
-    t.setTextColor(110, 110, 110),
-    t.setFontSize(9),
-    t.text(String((o.customerSnap && o.customerSnap.address) || ""), n, e),
-    (e += 13),
-    t.text(String((o.customerSnap && o.customerSnap.phone) || ""), n, e),
-    (e += 13),
-    t.text(String((o.customerSnap && o.customerSnap.email) || ""), n, e),
-    (e += 28));
-  const d = [
-    { label: "No", w: 22, align: "left" },
-    { label: "Event Date", w: 62, align: "left" },
-    { label: "Item", w: 108, align: "left" },
-    { label: "Qty", w: 24, align: "center" },
-    { label: "Price", w: 95, align: "right" },
-    { label: "Disc", w: 78, align: "right" },
-    { label: "Subtotal", w: 109, align: "right" },
-  ];
-  function f(u, y, c) {
-    let m = n;
-    (t.setFont("helvetica", y ? "bold" : "normal"),
-      t.setFontSize(y ? 8.5 : 9),
-      t.setTextColor(c[0], c[1], c[2]),
-      d.forEach((k, C) => {
-        const P = k.align === "right" ? m + k.w - 4 : m + 4,
-          w = { align: k.align === "right" ? "right" : "left" };
-        (C === 2 && (w.maxWidth = k.w - 6),
-          t.text(String(u[C]), P, e, w),
-          (m += k.w));
-      }));
-  }
-  (t.setFillColor(244, 246, 248),
-    t.rect(n, e - 12, r - n * 2, 18, "F"),
-    f(
-      d.map((u) => u.label),
-      !0,
-      [90, 90, 90],
-    ),
-    (e += 16),
-    (o.items || []).forEach((u, y) => {
-      (e > 740 && (t.addPage(), (e = 56)),
-        f(
-          [
-            y + 1,
-            fmtDatePdf(u.eventDate),
-            "",
-            u.qty,
-            fmtRp(u.unitPrice),
-            fmtRp(u.discount),
-            fmtRp(lineTotal(u)),
-          ],
-          !1,
-          [30, 30, 30],
-        ));
-      const ix = n + 88,
-        iw = 102;
-      (t.setFont("helvetica", "normal"),
-        t.setFontSize(9),
-        t.setTextColor(30, 30, 30));
-      const nameLines = t.splitTextToSize(u.packageItem || "", iw);
-      let iy = e;
-      nameLines.forEach((ln, idx) => {
-        (t.text(ln, ix, iy), idx < nameLines.length - 1 && (iy += 11));
-      });
-      let dy = iy + 10;
-      const descArr = splitDescLines(u.description);
-      if (descArr.length) {
-        (t.setFont("helvetica", "normal"),
-          t.setFontSize(7.5),
-          t.setTextColor(122, 122, 122));
-        descArr.forEach((dl) => {
-          t.splitTextToSize("• " + dl, iw).forEach((wl) => {
-            (e > 730 && (t.addPage(), (e = 56), (dy = e + 10)),
-              t.text(wl, ix, dy),
-              (dy += 9));
-          });
-        });
-      }
-      const sepY = Math.max(e + 6, dy - 3);
-      (t.setDrawColor(232, 232, 232),
-        t.line(n, sepY, r - n, sepY),
-        (e = Math.max(Math.max(e + 20, iy + 16), dy + 6)));
-    }),
-    (e += 12));
-  const v = docSubtotal(o.items);
-  (t.setFont("helvetica", "bold"),
-    t.setFontSize(11),
-    t.setTextColor(20, 20, 20),
-    t.text("Subtotal: " + fmtRp(v), r - n, e, { align: "right" }),
-    (e += 28),
-    e > 700 && (t.addPage(), (e = 56)),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(9),
-    t.setTextColor(90, 90, 90),
-    t.text("PAYMENT PLAN \u2014 " + (o.paymentPlan || ""), n, e),
-    (e += 16),
-    (o.payments || []).forEach((u) => {
-      (e > 740 && (t.addPage(), (e = 56)),
-        t.setFont("helvetica", "normal"),
-        t.setFontSize(9.5),
-        t.setTextColor(30, 30, 30),
-        t.text(u.label, n, e),
-        t.text(Number(u.percent).toFixed(1) + "%", n + 170, e),
-        t.text(fmtRp(u.amount), n + 240, e),
-        u.paid
-          ? (t.setFont("helvetica", "bold"),
-            t.setFontSize(9.5),
-            (() => {
-              const pw = t.getTextWidth("PAID") + 16,
-                ph2 = 15,
-                px = r - n - pw,
-                py = e - 11;
-              (t.setFillColor(209, 237, 222),
-                t.roundedRect(px, py, pw, ph2, 7, 7, "F"),
-                t.setTextColor(13, 92, 58),
-                t.text("PAID", r - n - 8, e, { align: "right" }));
-            })())
-          : (t.setFont("helvetica", "bold"),
-            t.setFontSize(9),
-            t.setTextColor(165, 165, 165),
-            t.text("PENDING", r - n, e, { align: "right" })),
-        (e += 16));
-    }),
-    (e += 18),
-    e > 700 && (t.addPage(), (e = 56)),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(9),
-    t.setTextColor(90, 90, 90),
-    t.text("PAYMENT INFORMATION", n, e),
-    (e += 14),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(9.5),
-    t.setTextColor(30, 30, 30),
-    t.text("All payments are only through:", n, e),
-    (e += 12));
-  const bx = n,
-    by = e,
-    bw = 168,
-    bh = 32;
-  (t.setFillColor(230, 237, 246),
-    t.roundedRect(bx, by, bw, bh, 6, 6, "F"),
-    t.setDrawColor(150, 176, 210),
-    t.setLineWidth(1.5),
-    t.roundedRect(bx, by, bw, bh, 6, 6, "S"),
-    t.setFillColor(30, 58, 95),
-    t.roundedRect(bx, by + 5, 4, bh - 10, 2, 2, "F"),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(12),
-    t.setTextColor(30, 58, 95),
-    t.text("BCA — 8761141988", bx + 13, by + 14),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(7.5),
-    t.setTextColor(100, 100, 100),
-    t.text("a.n. Mochamad Annas Afan", bx + 13, by + 25),
-    (e = by + bh + 20));
-  const cx = r / 2,
-    fy = ph - 38;
-  (t.setFontSize(8),
-    t.setTextColor(140, 140, 140),
-    t.text(
-      "Perumahan Taman Raya Citayam, Blok E4 No.02, Kecamatan Bojonggede, Bogor, Jawa Barat",
-      cx,
-      fy,
-      { align: "center" },
-    ),
-    t.text("Phone 0813 4000 4073   |   Instagram @Sumeriapoto", cx, fy + 13, {
-      align: "center",
-    }),
-    isFullyPaid(o) && addPaidFullStamp(t),
-    addWatermarks(t));
-  return t;
-}
 function downloadInvoicePdf(o) {
   const a = buildInvoicePdf(o),
     r =
@@ -7982,189 +7715,6 @@ Tim Sumeriapoto`;
     "https://wa.me/" + t + "?text=" + encodeURIComponent(r),
     "_blank",
   );
-}
-function buildQuotationPdf(o) {
-  if (typeof window.jspdf > "u") throw new Error("jsPDF not loaded");
-  const a = window.jspdf.jsPDF,
-    t = new a({ unit: "pt", format: "a4" }),
-    r = t.internal.pageSize.getWidth(),
-    ph = t.internal.pageSize.getHeight(),
-    n = 48;
-  let e = 64;
-  const l = 210,
-    p = l / LOGO_ASPECT;
-  try {
-    t.addImage(LOGO_DATA_URI, "PNG", n, e - p, l, p);
-  } catch (y) {
-    console.error("logo embed failed", y);
-  }
-  const logoBottom = e;
-  (t.setFont("helvetica", "normal"),
-    t.setFontSize(8.5),
-    t.setTextColor(120, 120, 120),
-    t.text("PHOTOGRAPHY & VIDEOGRAPHY", n, logoBottom + 13),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(17),
-    t.setTextColor(20, 20, 20),
-    t.text("QUOTATION", r - n, e - p + 16, { align: "right" }),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(10),
-    t.setTextColor(100, 100, 100),
-    t.text(o.quoNumber || "", r - n, e - p + 33, { align: "right" }),
-    t.text(fmtDatePdf(o.date), r - n, e - p + 47, { align: "right" }),
-    (e = logoBottom + 13 + 22),
-    t.setDrawColor(228, 231, 235),
-    t.line(n, e, r - n, e),
-    (e += 26),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(9.5),
-    t.setTextColor(20, 20, 20),
-    t.text("BILL TO", n, e),
-    (e += 16),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(10),
-    t.setTextColor(30, 30, 30),
-    t.text(String((o.customerSnap && o.customerSnap.name) || ""), n, e),
-    (e += 14),
-    t.setTextColor(110, 110, 110),
-    t.setFontSize(9),
-    t.text(String((o.customerSnap && o.customerSnap.address) || ""), n, e),
-    (e += 13),
-    t.text(String((o.customerSnap && o.customerSnap.phone) || ""), n, e),
-    (e += 13),
-    t.text(String((o.customerSnap && o.customerSnap.email) || ""), n, e),
-    (e += 28));
-  const d = [
-    { label: "No", w: 22, align: "left" },
-    { label: "Event Date", w: 62, align: "left" },
-    { label: "Item", w: 108, align: "left" },
-    { label: "Qty", w: 24, align: "center" },
-    { label: "Price", w: 95, align: "right" },
-    { label: "Disc", w: 78, align: "right" },
-    { label: "Subtotal", w: 109, align: "right" },
-  ];
-  function f(y, c, m) {
-    let k = n;
-    (t.setFont("helvetica", c ? "bold" : "normal"),
-      t.setFontSize(c ? 8.5 : 9),
-      t.setTextColor(m[0], m[1], m[2]),
-      d.forEach((C, P) => {
-        const w = C.align === "right" ? k + C.w - 4 : k + 4,
-          B = { align: C.align === "right" ? "right" : "left" };
-        (P === 2 && (B.maxWidth = C.w - 6),
-          t.text(String(y[P]), w, e, B),
-          (k += C.w));
-      }));
-  }
-  (t.setFillColor(244, 246, 248),
-    t.rect(n, e - 12, r - n * 2, 18, "F"),
-    f(
-      d.map((y) => y.label),
-      !0,
-      [90, 90, 90],
-    ),
-    (e += 16),
-    (o.items || []).forEach((y, c) => {
-      (e > 740 && (t.addPage(), (e = 56)),
-        f(
-          [
-            c + 1,
-            fmtDatePdf(y.eventDate),
-            "",
-            y.qty,
-            fmtRp(y.unitPrice),
-            fmtRp(y.discount),
-            fmtRp(lineTotal(y)),
-          ],
-          !1,
-          [30, 30, 30],
-        ));
-      const ix = n + 88,
-        iw = 102;
-      (t.setFont("helvetica", "normal"),
-        t.setFontSize(9),
-        t.setTextColor(30, 30, 30));
-      const nameLines = t.splitTextToSize(y.packageItem || "", iw);
-      let iy = e;
-      nameLines.forEach((ln, idx) => {
-        (t.text(ln, ix, iy), idx < nameLines.length - 1 && (iy += 11));
-      });
-      let dy = iy + 10;
-      const descArr = splitDescLines(y.description);
-      if (descArr.length) {
-        (t.setFont("helvetica", "normal"),
-          t.setFontSize(7.5),
-          t.setTextColor(122, 122, 122));
-        descArr.forEach((dl) => {
-          t.splitTextToSize("• " + dl, iw).forEach((wl) => {
-            (e > 730 && (t.addPage(), (e = 56), (dy = e + 10)),
-              t.text(wl, ix, dy),
-              (dy += 9));
-          });
-        });
-      }
-      const sepY = Math.max(e + 6, dy - 3);
-      (t.setDrawColor(232, 232, 232),
-        t.line(n, sepY, r - n, sepY),
-        (e = Math.max(Math.max(e + 20, iy + 16), dy + 6)));
-    }),
-    (e += 12));
-  const v = docSubtotal(o.items),
-    u = v * 0.3;
-  (t.setFont("helvetica", "bold"),
-    t.setFontSize(11),
-    t.setTextColor(20, 20, 20),
-    t.text("Subtotal: " + fmtRp(v), r - n, e, { align: "right" }),
-    (e += 16),
-    t.setTextColor(30, 58, 95),
-    t.text("Down payment (30%): " + fmtRp(u), r - n, e, { align: "right" }),
-    (e += 30),
-    e > 700 && (t.addPage(), (e = 56)),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(9),
-    t.setTextColor(90, 90, 90),
-    t.text("PAYMENT INFORMATION", n, e),
-    (e += 14),
-    t.setFont("helvetica", "normal"),
-    t.setFontSize(9.5),
-    t.setTextColor(30, 30, 30),
-    t.text("All payments are only through:", n, e),
-    (e += 12));
-  const bx = n,
-    by = e,
-    bw = 168,
-    bh = 32;
-  (t.setFillColor(230, 237, 246),
-    t.roundedRect(bx, by, bw, bh, 6, 6, "F"),
-    t.setDrawColor(150, 176, 210),
-    t.setLineWidth(1.5),
-    t.roundedRect(bx, by, bw, bh, 6, 6, "S"),
-    t.setFillColor(30, 58, 95),
-    t.roundedRect(bx, by + 5, 4, bh - 10, 2, 2, "F"),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(12),
-    t.setTextColor(30, 58, 95),
-    t.text("BCA — 8761141988", bx + 13, by + 14),
-    t.setFont("helvetica", "bold"),
-    t.setFontSize(7.5),
-    t.setTextColor(100, 100, 100),
-    t.text("a.n. Mochamad Annas Afan", bx + 13, by + 25),
-    (e = by + bh + 20));
-  const cx = r / 2,
-    fy = ph - 38;
-  (t.setFontSize(8),
-    t.setTextColor(140, 140, 140),
-    t.text(
-      "Perumahan Taman Raya Citayam, Blok E4 No.02, Kecamatan Bojonggede, Bogor, Jawa Barat",
-      cx,
-      fy,
-      { align: "center" },
-    ),
-    t.text("Phone 0813 4000 4073   |   Instagram @Sumeriapoto", cx, fy + 13, {
-      align: "center",
-    }),
-    addWatermarks(t));
-  return t;
 }
 function downloadQuotationPdf(o) {
   const a = buildQuotationPdf(o),
