@@ -4,13 +4,15 @@ export type Role = (typeof ROLES)[number];
 export const COLLECTIONS = ["customers", "quotations", "invoices", "expenses", "packages"] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
+// targets:manage = membuat/mengubah target omset bulanan (hanya owner).
 // analytics:finance = angka keuangan di Analytics (revenue, outstanding, dst). Tanpa ini hanya analytics pelanggan.
-export type Permission = `read:${Collection}` | `write:${Collection}` | "users:manage" | "analytics:finance";
+export type Permission = `read:${Collection}` | `write:${Collection}` | "users:manage" | "analytics:finance" | "targets:manage";
 
 const all: Permission[] = [
   ...COLLECTIONS.flatMap((c) => [`read:${c}`, `write:${c}`] as Permission[]),
   "users:manage",
   "analytics:finance",
+  "targets:manage",
 ];
 
 const matrix: Record<Role, ReadonlySet<Permission>> = {
