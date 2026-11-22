@@ -1,4 +1,3 @@
-import { randomBytes } from "node:crypto";
 import { and, asc, eq, ne } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
@@ -6,7 +5,6 @@ import { z } from "zod";
 import { audit } from "../audit.js";
 import { auth } from "../auth.js";
 import { db, schema } from "../db/client.js";
-import { sendInviteEmail } from "../email.js";
 import { requirePermission, requireUser, type AppEnv } from "../middleware.js";
 import { canManageRole, isRole, ROLES, type Role } from "../rbac.js";
 
@@ -28,50 +26,52 @@ userRoutes.get("/", async (c) => {
   return c.json({ users: rows });
 });
 
-const inviteBody = z.object({
+const passwordField = z.string().min(10, "Password minimal 10 karakter").max(128);
+
+const createBody = z.object({
   email: z.string().trim().toLowerCase().email().max(254),
   name: z.string().trim().min(1).max(100),
   role: z.enum(ROLES),
+  password: passwordField,
 });
 
-async function issueSetupToken(userId: string) {
-  const ctx = await auth().$context;
-  const token = randomBytes(24).toString("base64url");
-  await ctx.internalAdapter.createVerificationValue({
-    value: userId,
-    identifier: `reset-password:${token}`,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
-  });
-  return token;
-}
-
-userRoutes.post("/invite", async (c) => {
+// Akun dibuat langsung oleh owner dengan credential (tanpa email undangan). Password hanya dikenal
+// owner/penerima; di DB hanya hash. Penerima bisa menggantinya sendiri lewat menu Profile.
+userRoutes.post("/", async (c) => {
   const actor = c.get("user");
-  const parsed = inviteBody.safeParse(await c.req.json().catch(() => null));
-  if (!parsed.success) throw new HTTPException(400, { message: "Data undangan tidak valid" });
-  const { email, name, role } = parsed.data;
+  const parsed = createBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) throw new HTTPException(400, { message: parsed.error.issues[0]?.message ?? "Data akun tidak valid" });
+  const { email, name, role, password } = parsed.data;
   if (!canManageRole(actor.role, role)) throw new HTTPException(403, { message: "Tidak boleh memberi role ini" });
 
   const existing = await db().query.user.findFirst({ where: eq(schema.user.email, email) });
   if (existing) throw new HTTPException(409, { message: "Email sudah terdaftar" });
 
   const ctx = await auth().$context;
-  const created = await ctx.internalAdapter.createUser({ email, name, role, banned: false, emailVerified: false }, { method: "admin" });
-  const token = await issueSetupToken(created.id);
-  await sendInviteEmail(email, name, token, actor.name || actor.email);
-  await audit(actor.id, "user.invite", created.id, { email, role });
+  const created = await ctx.internalAdapter.createUser({ email, name, role, banned: false, emailVerified: true }, { method: "admin" });
+  await ctx.internalAdapter.createAccount({
+    userId: created.id,
+    providerId: "credential",
+    accountId: created.id,
+    password: await ctx.password.hash(password),
+  });
+  await audit(actor.id, "user.create", created.id, { email, role });
   return c.json({ id: created.id }, 201);
 });
 
-userRoutes.post("/:id/resend-invite", async (c) => {
+const resetBody = z.object({ password: passwordField });
+
+userRoutes.post("/:id/reset-password", async (c) => {
   const actor = c.get("user");
   const target = await db().query.user.findFirst({ where: eq(schema.user.id, c.req.param("id")) });
   if (!target || !isRole(target.role)) throw new HTTPException(404, { message: "User tidak ditemukan" });
   if (!canManageRole(actor.role, target.role)) throw new HTTPException(403, { message: "Tidak punya akses" });
-  if (target.banned) throw new HTTPException(409, { message: "Akun dinonaktifkan" });
-  const token = await issueSetupToken(target.id);
-  await sendInviteEmail(target.email, target.name, token, actor.name || actor.email);
-  await audit(actor.id, "user.resend_invite", target.id);
+  const parsed = resetBody.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) throw new HTTPException(400, { message: parsed.error.issues[0]?.message ?? "Password tidak valid" });
+  const ctx = await auth().$context;
+  await ctx.internalAdapter.updatePassword(target.id, await ctx.password.hash(parsed.data.password));
+  await ctx.internalAdapter.deleteUserSessions(target.id); // paksa login ulang dengan password baru
+  await audit(actor.id, "user.reset_password", target.id);
   return c.json({ ok: true });
 });
 

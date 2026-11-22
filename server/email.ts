@@ -41,13 +41,3 @@ export async function sendResetPasswordEmail(to: string, token: string) {
     text: `Reset password PayHub (berlaku 1 jam):\n${url}\n\nAbaikan jika bukan kamu yang meminta.`,
   });
 }
-
-export async function sendInviteEmail(to: string, name: string, token: string, invitedBy: string) {
-  const url = resetLink(token);
-  await sendMail({
-    to,
-    subject: "Undangan akun PayHub",
-    html: layout(`Halo ${name}`, `${invitedBy} mengundang kamu ke PayHub. Buat password untuk mengaktifkan akun. Tautan berlaku 1 jam; kalau kedaluwarsa, pakai "Lupa password" di halaman login.`, "Aktifkan akun", url, "Kalau kamu tidak mengenal undangan ini, abaikan email ini."),
-    text: `${invitedBy} mengundang kamu ke PayHub.\nAktifkan akun (berlaku 1 jam):\n${url}`,
-  });
-}

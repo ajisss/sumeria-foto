@@ -4,18 +4,26 @@ export type Role = (typeof ROLES)[number];
 export const COLLECTIONS = ["customers", "quotations", "invoices", "expenses", "packages"] as const;
 export type Collection = (typeof COLLECTIONS)[number];
 
-export type Permission = `read:${Collection}` | `write:${Collection}` | "users:manage";
+// analytics:finance = angka keuangan di Analytics (revenue, outstanding, dst). Tanpa ini hanya analytics pelanggan.
+export type Permission = `read:${Collection}` | `write:${Collection}` | "users:manage" | "analytics:finance";
 
 const all: Permission[] = [
   ...COLLECTIONS.flatMap((c) => [`read:${c}`, `write:${c}`] as Permission[]),
   "users:manage",
+  "analytics:finance",
 ];
 
 const matrix: Record<Role, ReadonlySet<Permission>> = {
-  // owner: segalanya, termasuk kelola semua user.
+  // owner: segalanya, termasuk kelola semua user (satu-satunya yang boleh membuat/mengubah akun).
   owner: new Set(all),
-  // admin: semua data, kelola user staff/viewer saja (lihat MANAGEABLE_ROLES).
-  admin: new Set(all),
+  // admin: hanya menu Sales (quotation, invoice, orders, kalender, package item) + Customer.
+  // Tanpa pengeluaran/keuangan, tanpa analytics finance, tanpa kelola user.
+  admin: new Set<Permission>([
+    "read:customers", "write:customers",
+    "read:quotations", "write:quotations",
+    "read:invoices", "write:invoices",
+    "read:packages", "write:packages",
+  ]),
   // staff: operasional harian. Tidak bisa lihat pengeluaran.
   staff: new Set<Permission>([
     "read:customers", "write:customers",
@@ -23,9 +31,10 @@ const matrix: Record<Role, ReadonlySet<Permission>> = {
     "read:invoices", "write:invoices",
     // katalog paket: staff boleh baca (untuk dropdown quotation/invoice), ubah hanya owner/admin.
     "read:packages",
+    "analytics:finance",
   ]),
   // viewer: baca saja, tanpa pengeluaran.
-  viewer: new Set<Permission>(["read:customers", "read:quotations", "read:invoices", "read:packages"]),
+  viewer: new Set<Permission>(["read:customers", "read:quotations", "read:invoices", "read:packages", "analytics:finance"]),
 };
 
 export function isRole(v: unknown): v is Role {
@@ -47,7 +56,7 @@ export function permissionsOf(role: unknown): Permission[] {
 /** Role yang boleh diberikan/diubah/dinonaktifkan oleh seorang actor. */
 export const MANAGEABLE_ROLES: Record<Role, readonly Role[]> = {
   owner: ["owner", "admin", "staff", "viewer"],
-  admin: ["staff", "viewer"],
+  admin: [],
   staff: [],
   viewer: [],
 };

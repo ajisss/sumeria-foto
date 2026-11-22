@@ -928,3 +928,144 @@ function AnalyticsPage({ ctx }) {
     h("div", { className: "an-mobile-only" }, h("h3", { style: { margin: "0 0 10px", fontSize: 14, color: BRAND.inkSoft, fontWeight: 500 } }, S.menu), h(HomePage, { ctx })),
   );
 }
+
+/* ---------- Analytics pelanggan (untuk role tanpa akses keuangan, mis. Admin) ----------
+   Dihitung di klien dari customers/quotations/invoices yang sudah dimuat. Tidak memakai /api/analytics
+   (yang berisi angka keuangan dan dibatasi izin "analytics:finance" di server) dan tidak menampilkan nominal. */
+const CA_STR = {
+  id: {
+    title: "Analytics Customer",
+    subtitle: "Ringkasan pelanggan: jumlah, pertumbuhan, dan order.",
+    total: "Total customer", active: "Customer aktif", fresh: "Customer baru", repeat: "Repeat order",
+    quo: "Quotation", inv: "Invoice",
+    in_period: "invoice di periode ini", have_ordered: "pernah order", first_order: "order pertama di periode", of_buyers: "dari customer yang pernah order",
+    new_by_month: "Customer baru per bulan", top_orders: "Customer dengan order terbanyak", by_city: "Asal kota", by_gender: "Gender",
+    orders_unit: "order", no_data: "Belum ada data", no_city: "Tanpa kota", no_gender: "Tidak diisi", male: "Laki-laki", female: "Perempuan", unnamed: "(tanpa nama)",
+    legend_new: "Customer baru",
+  },
+  en: {
+    title: "Customer Analytics",
+    subtitle: "Customer overview: count, growth and orders.",
+    total: "Total customers", active: "Active customers", fresh: "New customers", repeat: "Repeat orders",
+    quo: "Quotations", inv: "Invoices",
+    in_period: "invoices in this period", have_ordered: "have ordered", first_order: "first order in period", of_buyers: "of customers who ordered",
+    new_by_month: "New customers by month", top_orders: "Customers with most orders", by_city: "By city", by_gender: "Gender",
+    orders_unit: "orders", no_data: "No data yet", no_city: "No city", no_gender: "Not set", male: "Male", female: "Female", unnamed: "(no name)",
+    legend_new: "New customers",
+  },
+};
+
+function CustomerAnalyticsPage({ ctx }) {
+  const h = React.createElement;
+  const { customers, invoices, quotations, setTab, lang } = ctx;
+  const T = CA_STR[lang === "en" ? "en" : "id"];
+  const S = AN_STR[lang === "en" ? "en" : "id"];
+  const [preset, setPreset] = useState("year");
+  const [custom, setCustom] = useState({ start: "", end: "" });
+  const range = anRangeFor(preset, custom, undefined);
+  const inRange = (d) => !!d && d >= range.start && d <= range.end;
+
+  const d = useMemo(() => {
+    const norm = (s) => String(s || "").trim().toLowerCase();
+    const byName = {};
+    (customers || []).forEach((c) => { byName[norm(c.name)] = c.id; });
+    const cidOf = (r) => r.customerId || byName[norm(r.customerSnap && r.customerSnap.name)] || "";
+    const per = {};
+    (customers || []).forEach((c) => { per[c.id] = { c, inv: 0, invInRange: 0, first: "" }; });
+    const touch = (r, isInv) => {
+      const row = per[cidOf(r)];
+      if (!row) return;
+      const date = r.date || "";
+      if (isInv) { row.inv += 1; if (inRange(date)) row.invInRange += 1; }
+      if (date && (!row.first || date < row.first)) row.first = date;
+    };
+    (invoices || []).forEach((r) => touch(r, true));
+    (quotations || []).forEach((r) => touch(r, false));
+    const rows = Object.values(per);
+    const buyers = rows.filter((r) => r.inv > 0);
+    const fresh = rows.filter((r) => inRange(r.first));
+    const months = anMonthKeys(range.start, range.end).map((key) => ({ key, n: rows.filter((r) => r.first && r.first.slice(0, 7) === key).length }));
+    const tally = (fn) => {
+      const m = {};
+      rows.forEach((r) => { const k = fn(r.c); m[k] = (m[k] || 0) + 1; });
+      return Object.entries(m).map(([name, n]) => ({ name, n })).sort((a, b) => b.n - a.n);
+    };
+    return {
+      total: rows.length,
+      active: rows.filter((r) => r.invInRange > 0).length,
+      fresh: fresh.length,
+      repeat: buyers.filter((r) => r.inv >= 2).length,
+      buyers: buyers.length,
+      invCount: (invoices || []).filter((r) => inRange(r.date)).length,
+      quoCount: (quotations || []).filter((r) => inRange(r.date)).length,
+      months,
+      top: rows.filter((r) => r.inv > 0).sort((a, b) => b.inv - a.inv).slice(0, 6),
+      city: tally((c) => (c.city || "").trim() || "\u0000").slice(0, 6),
+      gender: tally((c) => (c.gender || "").trim() || "\u0000"),
+    };
+  }, [customers, invoices, quotations, range.start, range.end]);
+
+  const monthLbl = (k) => new Date(k + "-01T00:00:00").toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", { month: "short", year: "2-digit" });
+  const maxMonth = Math.max(1, ...d.months.map((m) => m.n));
+  const maxTop = Math.max(1, ...d.top.map((r) => r.inv));
+  const genderName = (g) => (g === "\u0000" ? T.no_gender : /^(m|male|laki)/i.test(g) ? T.male : /^(f|female|perempuan|wanita)/i.test(g) ? T.female : g);
+  const kpi = (label, value, foot) => h("div", { className: "an-card", key: label }, h("h3", null, label), h("p", { className: "an-big" }, value), h("div", { className: "an-kpi-foot" }, h("span", null, foot)));
+  const bars = (items, nameOf, total) =>
+    items.length === 0
+      ? h("div", { className: "an-empty" }, T.no_data)
+      : h("div", { className: "an-list" }, items.map((it) =>
+          h("div", { key: it.name },
+            h("span", { style: { fontWeight: 500 } }, Math.round((it.n / (total || 1)) * 100) + "%"),
+            h("span", { className: "an-pill" }, h("span", null, nameOf(it.name))),
+            h("div", { className: "an-bar" }, h("div", { style: { width: (it.n / (total || 1)) * 100 + "%" } })),
+            h("span", { className: "an-amt" }, it.n))));
+
+  return h(
+    "div",
+    { className: "an" },
+    h("style", null, AN_CSS(BRAND)),
+    h(PageHeader, { title: T.title, subtitle: T.subtitle }),
+    h("div", { className: "an-head" },
+      h("div", { className: "an-filters" },
+        h("div", { className: "an-chip" },
+          h("span", { className: "lbl" }, S.date),
+          h("span", { className: "val" }, h(ShSelect, { value: preset, onChange: (p) => { if (p === "custom" && !custom.start) setCustom({ start: range.start, end: range.end }); setPreset(p); }, icon: "calendar", label: S.date, options: ["year", "quarter", "month", "30d", "all", "custom"].map((p) => ({ value: p, label: S["p_" + p] })) }))),
+        preset === "custom" && h("div", { className: "an-chip" }, h("span", { className: "val" }, h(ShDateRange, { value: custom, onChange: setCustom, lang, label: S.date }))),
+        preset !== "custom" && h("span", { className: "an-range" }, fmtDate(range.start) + " – " + fmtDate(range.end)))),
+    h("div", { className: "an-grid an-kpis" },
+      kpi(T.total, d.total, d.buyers + " " + T.have_ordered),
+      kpi(T.active, d.active, d.invCount + " " + T.in_period),
+      kpi(T.fresh, d.fresh, T.first_order),
+      kpi(T.repeat, d.repeat, d.buyers ? Math.round((d.repeat / d.buyers) * 100) + "% " + T.of_buyers : T.of_buyers)),
+    h("div", { className: "an-grid an-row2" },
+      h("div", { className: "an-card" },
+        h("h3", null, T.new_by_month),
+        h("p", { className: "an-big" }, d.fresh),
+        h("hr", { className: "an-divider" }),
+        d.months.every((m) => !m.n)
+          ? h("div", { className: "an-empty" }, T.no_data)
+          : h("div", { className: "an-chart" }, d.months.map((m) =>
+              h("div", { className: "an-col", key: m.key, title: monthLbl(m.key) + ": " + m.n },
+                h("div", { className: "an-track" }, h("span", { className: "an-hatch", style: { height: (m.n / maxMonth) * 100 + "%", background: "var(--an-g)" } })),
+                h("div", { className: "an-mlabel" }, monthLbl(m.key)))))),
+      h("div", { className: "an-card" },
+        h("h3", null, T.top_orders),
+        h("hr", { className: "an-divider" }),
+        d.top.length === 0
+          ? h("div", { className: "an-empty" }, T.no_data)
+          : h("div", { className: "an-list" }, d.top.map((r) =>
+              h("div", { key: r.c.id },
+                h("span", { style: { fontWeight: 500 } }, r.inv),
+                h("span", { className: "an-pill" }, anIcon("user", 13), h("span", null, r.c.name || T.unnamed)),
+                h("div", { className: "an-bar" }, h("div", { style: { width: (r.inv / maxTop) * 100 + "%" } })),
+                h("span", { className: "an-amt" }, r.inv + " " + T.orders_unit))))),
+    ),
+    h("div", { className: "an-grid an-row2" },
+      h("div", { className: "an-card" }, h("h3", null, T.by_city), h("hr", { className: "an-divider" }), bars(d.city, (n) => (n === "\u0000" ? T.no_city : n), d.total)),
+      h("div", { className: "an-card" }, h("h3", null, T.by_gender), h("hr", { className: "an-divider" }), bars(d.gender, genderName, d.total))),
+    h("div", { className: "an-grid an-kpis", style: { gridTemplateColumns: "1fr 1fr" } },
+      kpi(T.quo, d.quoCount, S.date + ": " + fmtDate(range.start) + " – " + fmtDate(range.end)),
+      kpi(T.inv, d.invCount, S.date + ": " + fmtDate(range.start) + " – " + fmtDate(range.end))),
+    h("div", { className: "an-mobile-only" }, h("h3", { style: { margin: "0 0 10px", fontSize: 14, color: BRAND.inkSoft, fontWeight: 500 } }, S.menu), h(HomePage, { ctx })),
+  );
+}

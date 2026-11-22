@@ -1,9 +1,8 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
-const sent: { kind: "invite" | "reset"; to: string; token: string }[] = [];
+const sent: { kind: "reset"; to: string; token: string }[] = [];
 vi.mock("../server/email.js", () => ({
   sendResetPasswordEmail: async (to: string, token: string) => void sent.push({ kind: "reset", to, token }),
-  sendInviteEmail: async (to: string, _n: string, token: string) => void sent.push({ kind: "invite", to, token }),
   sendMail: async () => {},
   resetLink: (t: string) => t,
 }));
@@ -135,8 +134,8 @@ describe("rbac data (per record)", () => {
     expect((await call("/api/data/nope", { jar })).status).toBe(404);
   });
 
-  it("admin: konflik per record, record lain tetap tersimpan", async () => {
-    const { jar } = await login("admin@x.test");
+  it("owner: konflik per record, record lain tetap tersimpan", async () => {
+    const { jar } = await login("owner@x.test");
     const a = await sync(jar, "expenses", [
       { op: "upsert", id: "e1", version: 0, data: { id: "e1", n: 1 } },
       { op: "upsert", id: "e2", version: 0, data: { id: "e2", n: 1 } },
@@ -160,7 +159,7 @@ describe("rbac data (per record)", () => {
   });
 
   it("delete: versi harus cocok; sudah terhapus idempoten", async () => {
-    const { jar } = await login("admin@x.test");
+    const { jar } = await login("owner@x.test");
     expect((await sync(jar, "expenses", [{ op: "delete", id: "e1", version: 1 }])).data.results[0].conflict).toBe(true);
     expect((await sync(jar, "expenses", [{ op: "delete", id: "e1", version: 2 }])).data.results[0].ok).toBe(true);
     expect((await sync(jar, "expenses", [{ op: "delete", id: "e1", version: 2 }])).data.results[0].ok).toBe(true);
@@ -169,13 +168,29 @@ describe("rbac data (per record)", () => {
   });
 
   it("rev: tidak berubah -> unchanged; berubah -> data baru; urutan sisip terjaga", async () => {
-    const { jar } = await login("admin@x.test");
+    const { jar } = await login("owner@x.test");
     const first = await call("/api/data/expenses", { jar });
     expect((await call(`/api/data/expenses?rev=${encodeURIComponent(first.data.rev)}`, { jar })).data.unchanged).toBe(true);
     await sync(jar, "expenses", [{ op: "upsert", id: "e0z", version: 0, data: { id: "e0z" } }]);
     const next = await call(`/api/data/expenses?rev=${encodeURIComponent(first.data.rev)}`, { jar });
     expect(next.data.unchanged).toBeUndefined();
     expect(next.data.records.map((r: any) => r.id).at(-1)).toBe("e0z");
+  });
+
+  it("admin: hanya Sales + Customer; tanpa expenses, users, analytics finance", async () => {
+    const { jar } = await login("admin@x.test");
+    for (const k of ["customers", "quotations", "invoices", "packages"]) {
+      expect((await call(`/api/data/${k}`, { jar })).status, k).toBe(200);
+      expect((await sync(jar, k, [{ op: "upsert", id: "adm-" + k, version: 0, data: { id: "adm-" + k } }])).status, k).toBe(200);
+    }
+    expect((await call("/api/data/expenses", { jar })).status).toBe(403);
+    expect((await sync(jar, "expenses", [{ op: "upsert", id: "adm-e", version: 0, data: {} }])).status).toBe(403);
+    expect((await call("/api/users", { jar })).status).toBe(403);
+    expect((await call("/api/analytics?start=2026-01-01&end=2026-02-28", { jar })).status).toBe(403);
+    const me = (await call("/api/me", { jar })).data.permissions as string[];
+    expect(me).not.toContain("analytics:finance");
+    expect(me).not.toContain("read:expenses");
+    expect(me).not.toContain("users:manage");
   });
 
   it("payload tidak valid ditolak", async () => {
@@ -238,34 +253,56 @@ describe("kelola user", () => {
     }
   });
 
-  it("admin tidak bisa membuat admin/owner, tapi bisa staff", async () => {
+  it("admin tidak bisa membuat akun atau reset password (hanya owner)", async () => {
     const { jar } = await login("admin@x.test");
-    for (const role of ["owner", "admin"]) {
-      const r = await call("/api/users/invite", { method: "POST", json: { email: `${role}2@x.test`, name: "N", role }, jar });
-      expect(r.status).toBe(403);
-    }
-    const ok = await call("/api/users/invite", { method: "POST", json: { email: "newstaff@x.test", name: "New", role: "staff" }, jar });
-    expect(ok.status).toBe(201);
+    const r = await call("/api/users", { method: "POST", json: { email: "x1@x.test", name: "N", role: "staff", password: "password-panjang-1" }, jar });
+    expect(r.status).toBe(403);
+    expect((await call(`/api/users/anything/reset-password`, { method: "POST", json: { password: "password-panjang-1" }, jar })).status).toBe(403);
   });
 
-  it("alur undangan: set password via token lalu login; token sekali pakai", async () => {
-    const mail = sent.filter((s) => s.kind === "invite" && s.to === "newstaff@x.test").at(-1)!;
-    expect((await login("newstaff@x.test")).r.status).toBe(401); // belum punya password
-    const set = await call("/api/auth/reset-password", { method: "POST", json: { token: mail.token, newPassword: "password-baru-123" } });
-    expect(set.status).toBe(200);
-    const { r, jar } = await login("newstaff@x.test", "password-baru-123");
-    expect(r.status).toBe(200);
-    expect((await call("/api/me", { jar })).data.user.role).toBe("staff");
-    const again = await call("/api/auth/reset-password", { method: "POST", json: { token: mail.token, newPassword: "password-lain-123" } });
-    expect(again.status).toBe(400);
-  });
-
-  it("password terlalu pendek ditolak", async () => {
+  it("owner membuat akun dengan credential: bisa login, role benar, password tersimpan sebagai hash", async () => {
     const { jar } = await login("owner@x.test");
-    await call("/api/users/invite", { method: "POST", json: { email: "short@x.test", name: "S", role: "viewer" }, jar });
-    const mail = sent.filter((s) => s.to === "short@x.test").at(-1)!;
-    const r = await call("/api/auth/reset-password", { method: "POST", json: { token: mail.token, newPassword: "pendek" } });
-    expect(r.status).toBe(400);
+    const ok = await call("/api/users", { method: "POST", json: { email: "Sales1@X.test", name: "Sales Satu", role: "admin", password: "password-awal-123" }, jar });
+    expect(ok.status).toBe(201);
+    const { r, jar: sj } = await login("sales1@x.test", "password-awal-123");
+    expect(r.status).toBe(200);
+    expect((await call("/api/me", { jar: sj })).data.user.role).toBe("admin");
+    const row = await pool.query("select password from account where provider_id='credential' and user_id=$1", [ok.data.id]);
+    expect(row.rows[0].password).not.toContain("password-awal-123");
+    // email duplikat (beda huruf) ditolak
+    expect((await call("/api/users", { method: "POST", json: { email: "sales1@x.test", name: "Dup", role: "staff", password: "password-awal-123" }, jar })).status).toBe(409);
+  });
+
+  it("validasi: password pendek, role liar, email jelek ditolak", async () => {
+    const { jar } = await login("owner@x.test");
+    for (const body of [
+      { email: "p1@x.test", name: "P", role: "viewer", password: "pendek" },
+      { email: "p2@x.test", name: "P", role: "superadmin", password: "password-panjang-1" },
+      { email: "bukan-email", name: "P", role: "viewer", password: "password-panjang-1" },
+      { email: "p3@x.test", name: "", role: "viewer", password: "password-panjang-1" },
+      { email: "p4@x.test", name: "P", role: "viewer" },
+    ]) {
+      expect((await call("/api/users", { method: "POST", json: body, jar })).status, JSON.stringify(body)).toBe(400);
+    }
+  });
+
+  it("owner reset password user: password lama mati, sesi dicabut, password baru jalan", async () => {
+    const owner = (await login("owner@x.test")).jar;
+    const users = (await call("/api/users", { jar: owner })).data.users as any[];
+    const id = users.find((u) => u.email === "sales1@x.test").id;
+    const old = (await login("sales1@x.test", "password-awal-123")).jar;
+    expect((await call("/api/me", { jar: old })).status).toBe(200);
+    expect((await call(`/api/users/${id}/reset-password`, { method: "POST", json: { password: "pendek" }, jar: owner })).status).toBe(400);
+    expect((await call(`/api/users/${id}/reset-password`, { method: "POST", json: { password: "password-reset-456" }, jar: owner })).status).toBe(200);
+    expect((await call("/api/me", { jar: old })).status).toBe(401);
+    expect((await login("sales1@x.test", "password-awal-123")).r.status).toBe(401);
+    expect((await login("sales1@x.test", "password-reset-456")).r.status).toBe(200);
+    expect((await call(`/api/users/ghost-id/reset-password`, { method: "POST", json: { password: "password-reset-456" }, jar: owner })).status).toBe(404);
+  });
+
+  it("endpoint undangan lama sudah tidak ada", async () => {
+    const { jar } = await login("owner@x.test");
+    expect((await call("/api/users/invite", { method: "POST", json: { email: "i@x.test", name: "I", role: "viewer" }, jar })).status).toBe(404);
   });
 
   it("lupa password: email terdaftar & tidak terdaftar dijawab sama", async () => {
@@ -289,7 +326,7 @@ describe("kelola user", () => {
     expect((await login("viewer@x.test", "viewer-pass-baru-1")).r.status).toBe(200);
   });
 
-  it("ban: sesi dicabut & tidak bisa login; admin tak bisa ban admin; tidak bisa ban diri sendiri", async () => {
+  it("ban: sesi dicabut & tidak bisa login; admin tak bisa mengelola user; owner tak bisa ban diri sendiri", async () => {
     const owner = (await login("owner@x.test")).jar;
     const users = (await call("/api/users", { jar: owner })).data.users as any[];
     const id = (e: string) => users.find((u) => u.email === e).id;
@@ -300,9 +337,12 @@ describe("kelola user", () => {
     expect((await login("staff@x.test")).r.status).toBe(403);
 
     const admin = (await login("admin@x.test")).jar;
+    // admin tidak punya users:manage: semua ditolak
     expect((await call(`/api/users/${id("owner@x.test")}`, { method: "PATCH", json: { banned: true }, jar: admin })).status).toBe(403);
-    expect((await call(`/api/users/${id("admin@x.test")}`, { method: "PATCH", json: { role: "viewer" }, jar: admin })).status).toBe(400);
+    expect((await call(`/api/users/${id("admin@x.test")}`, { method: "PATCH", json: { role: "viewer" }, jar: admin })).status).toBe(403);
     expect((await call(`/api/users/${id("viewer@x.test")}`, { method: "PATCH", json: { role: "owner" }, jar: admin })).status).toBe(403);
+    // owner tidak bisa ban diri sendiri
+    expect((await call(`/api/users/${id("owner@x.test")}`, { method: "PATCH", json: { banned: true }, jar: owner })).status).toBe(400);
   });
 
   it("selalu ada minimal satu owner aktif", async () => {

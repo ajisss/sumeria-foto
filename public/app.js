@@ -469,6 +469,14 @@ const Search = makeIcon(
       React.createElement("path", { d: "m3 7 9 6 9-6" }),
     ),
   ),
+  KeyRound = makeIcon(
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement("circle", { cx: "8", cy: "15", r: "4" }),
+      React.createElement("path", { d: "m10.8 12.2 8.2-8.2M16 7l3 3M14 9l2 2" }),
+    ),
+  ),
   Lock = makeIcon(
     React.createElement(
       React.Fragment,
@@ -2052,8 +2060,6 @@ function MainApp({
     [c, m, k] = useCollection("payhub_invoices", [], collHooks("invoices")),
     [C, P, w] = useCollection("payhub_expenses", [], collHooks("expenses")),
     [PK, setPK, pkLoaded] = useCollection("payhub_packages", [], collHooks("packages")),
-    seededRef = useRef(false),
-    defaultsRef = PACKAGE_DEFAULTS_BOX.list || (PACKAGE_DEFAULTS_BOX.list = PACKAGE_ITEMS_LIST.slice()),
     B = f && y && k && w,
     [I, s] = useState("home"),
     [g, i] = useState(null),
@@ -2090,7 +2096,8 @@ function MainApp({
     }
   }, [B, LGchecked]);
   useMemo(() => {
-    if (PK.length) {
+    // Dropdown paket mengikuti katalog apa adanya (termasuk kosong) setelah katalog selesai dimuat.
+    if (pkLoaded) {
       PACKAGE_ITEMS_LIST.length = 0;
       Object.keys(PACKAGE_PRICES).forEach((k) => delete PACKAGE_PRICES[k]);
       PK.forEach((x) => {
@@ -2098,13 +2105,7 @@ function MainApp({
         PACKAGE_PRICES[x.name] = Number(x.price) || 0;
       });
     }
-  }, [PK]);
-  useEffect(() => {
-    if (pkLoaded && PK.length === 0 && !seededRef.current && can("write:packages")) {
-      seededRef.current = !0;
-      setPK(defaultsRef.map((nm) => ({ id: uid(), name: nm, price: 0 })));
-    }
-  }, [pkLoaded, PK.length]);
+  }, [PK, pkLoaded]);
   const _ = useMemo(() => computeOverdueInvoices(c), [c]),
     N = {
       customers: p,
@@ -3118,7 +3119,7 @@ function BackupModal({ ctx: o, onClose: a }) {
 function PageRouter({ tab: o, ctx: a }) {
   switch (o) {
     case "home":
-      return React.createElement(AnalyticsPage, { ctx: a });
+      return React.createElement(a.can("analytics:finance") ? AnalyticsPage : CustomerAnalyticsPage, { ctx: a });
     case "customers":
       return React.createElement(CustomersPage, { ctx: a });
     case "quotations":
@@ -3145,7 +3146,7 @@ function PageRouter({ tab: o, ctx: a }) {
     case "bestsellers":
       return React.createElement(PackagesPage, { ctx: a });
     default:
-      return React.createElement(AnalyticsPage, { ctx: a });
+      return React.createElement(a.can("analytics:finance") ? AnalyticsPage : CustomerAnalyticsPage, { ctx: a });
   }
 }
 // Judul & subjudul halaman tampil di header global (header.js); di sini hanya baris aksi (tombol) jika ada.
@@ -6942,7 +6943,7 @@ function PackagesPage({ ctx: o }) {
                               h(IconBtn, { key: "e", icon: Pencil, title: e("edit"), onClick: () => setEdit(x) }),
                               h(IconBtn, { key: "d", icon: Trash2, title: e("delete"), tone: "danger", onClick: () => setDel(x) }),
                             ]
-                          : h(IconBtn, { icon: Plus, title: e("pkg_add_to_catalog"), onClick: () => setEdit({ name: x.name, price: 0 }) }),
+                          : h(IconBtn, { icon: Pencil, title: e("edit"), onClick: () => setEdit({ name: x.name, price: 0 }) }),
                       ),
                     ),
                 ),
@@ -8176,7 +8177,25 @@ function downloadQuotationPdf(o) {
       ".pdf";
   return (a.save(r), r);
 }
-function sendQuotationWhatsApp(o) {
+async function sendQuotationWhatsApp(o) {
+  const text = buildQuotationWaMessage(o),
+    phone = waPhone(o.customerSnap && o.customerSnap.phone);
+  /* Utama: Web Share API dengan file PDF. Browser tidak bisa melampirkan file lewat link wa.me, tapi
+     menu Share (Mac/HP) bisa mengirim PDF + teks sekaligus ke WhatsApp. Nomor tujuan dipilih di WhatsApp. */
+  try {
+    const pdf = buildQuotationPdf(o),
+      file = new File([pdf.output("blob")], "Quotation-" + (o.quoNumber || "Sumeriapoto").split("/").join("-") + ".pdf", {
+        type: "application/pdf",
+      });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text });
+      return;
+    }
+  } catch (err) {
+    if (err && err.name === "AbortError") return; /* user menutup menu Share */
+    console.error("share failed, fallback ke unduh + wa.me", err);
+  }
+  /* Cadangan: unduh PDF, buka WhatsApp dengan teks; PDF dilampirkan manual. */
   try {
     downloadQuotationPdf(o);
   } catch (r) {
@@ -8185,12 +8204,7 @@ function sendQuotationWhatsApp(o) {
         "PDF belum bisa dibuat karena butuh koneksi internet aktif. WhatsApp tetap akan dibuka, tapi lampirkan quotation secara manual ya.",
       ));
   }
-  const a = waPhone(o.customerSnap && o.customerSnap.phone),
-    t = buildQuotationWaMessage(o);
-  window.open(
-    "https://wa.me/" + a + "?text=" + encodeURIComponent(t),
-    "_blank",
-  );
+  window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(text), "_blank");
 }
 const __root = ReactDOM.createRoot(document.getElementById("root"));
 __root.render(React.createElement(App, null));
