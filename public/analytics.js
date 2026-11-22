@@ -1190,7 +1190,7 @@ function TargetsPage({ ctx }) {
   const months = data ? data.months : [];
   const sumT = months.reduce((s, m) => s + (m.target || 0), 0);
   const sumR = months.filter((m) => m.target).reduce((s, m) => s + m.revenue, 0);
-  const years = [nowY - 2, nowY - 1, nowY, nowY + 1];
+  const years = Array.from({ length: 8 }, (_, i) => nowY - 2 + i); // tahun ini -2 sampai +5
 
   return h("div", { className: "an" },
     h("style", null, AN_CSS(BRAND)),
