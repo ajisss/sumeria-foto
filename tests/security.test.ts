@@ -1,9 +1,8 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
 
-const sent: { kind: "invite" | "reset"; to: string; token: string }[] = [];
+const sent: { kind: "reset"; to: string; token: string }[] = [];
 vi.mock("../server/email.js", () => ({
   sendResetPasswordEmail: async (to: string, token: string) => void sent.push({ kind: "reset", to, token }),
-  sendInviteEmail: async (to: string, _n: string, token: string) => void sent.push({ kind: "invite", to, token }),
   sendMail: async () => {},
   resetLink: (t: string) => t,
 }));
@@ -69,7 +68,7 @@ describe("sapuan semua endpoint tanpa login", () => {
     ["GET", "/api/me"],
     ["GET", "/api/data/customers"], ["GET", "/api/data/invoices"], ["GET", "/api/data/expenses"],
     ["POST", "/api/data/customers/sync"], ["GET", "/api/analytics"],
-    ["GET", "/api/users"], ["POST", "/api/users/invite"], ["PATCH", "/api/users/abc"], ["POST", "/api/users/abc/resend-invite"],
+    ["GET", "/api/users"], ["POST", "/api/users"], ["PATCH", "/api/users/abc"], ["POST", "/api/users/abc/reset-password"],
   ];
   for (const [m, p] of routes) {
     it(`${m} ${p} -> 401`, async () => {
@@ -170,7 +169,7 @@ describe("CSRF & content-type", () => {
     const { jar } = await login("owner@s.test");
     for (const [p, body] of [
       ["/api/data/customers/sync", { changes: [{ op: "upsert", id: "a", version: 0, data: {} }] }],
-      ["/api/users/invite", { email: "z@z.test", name: "z", role: "viewer" }],
+      ["/api/users", { email: "z@z.test", name: "z", role: "viewer", password: "password-panjang-1" }],
       ["/api/auth/sign-out", {}],
       ["/api/auth/update-user", { name: "x" }],
     ] as const) {
@@ -180,12 +179,12 @@ describe("CSRF & content-type", () => {
   });
   it("Origin 'null' (iframe sandbox) ditolak", async () => {
     const { jar } = await login("owner@s.test");
-    const r = await call("/api/users/invite", { method: "POST", jar, json: { email: "n@n.test", name: "n", role: "viewer" }, origin: "null" });
+    const r = await call("/api/users", { method: "POST", jar, json: { email: "n@n.test", name: "n", role: "viewer", password: "password-panjang-1" }, origin: "null" });
     expect(r.status).toBe(403);
   });
   it("Sec-Fetch-Site cross-site tanpa Origin ditolak", async () => {
     const { jar } = await login("owner@s.test");
-    const r = await call("/api/users/invite", { method: "POST", jar, json: { email: "n2@n.test", name: "n", role: "viewer" }, origin: null, headers: { "sec-fetch-site": "cross-site" } });
+    const r = await call("/api/users", { method: "POST", jar, json: { email: "n2@n.test", name: "n", role: "viewer", password: "password-panjang-1" }, origin: null, headers: { "sec-fetch-site": "cross-site" } });
     expect(r.status).toBe(403);
   });
   it("body text/plain ditolak 415", async () => {
@@ -224,15 +223,15 @@ describe("injeksi & input berbahaya", () => {
     }
     expect((await pool.query("select to_regclass('public.records') r")).rows[0].r).not.toBeNull();
   });
-  it("invite: email berisi header injection / nama sangat panjang ditolak", async () => {
+  it("buat akun: email berisi header injection / nama sangat panjang / role liar ditolak", async () => {
     const { jar } = await login("owner@s.test");
     for (const body of [
-      { email: "a@b.test\r\nBcc: evil@x.test", name: "x", role: "viewer" },
-      { email: "ok1@b.test", name: "x".repeat(500), role: "viewer" },
-      { email: "ok2@b.test", name: "x", role: "superadmin" },
-      { email: "ok3@b.test", name: "x", role: ["owner"] },
+      { email: "a@b.test\r\nBcc: evil@x.test", name: "x", role: "viewer", password: "password-panjang-1" },
+      { email: "ok1@b.test", name: "x".repeat(500), role: "viewer", password: "password-panjang-1" },
+      { email: "ok2@b.test", name: "x", role: "superadmin", password: "password-panjang-1" },
+      { email: "ok3@b.test", name: "x", role: ["owner"], password: "password-panjang-1" },
     ]) {
-      const r = await call("/api/users/invite", { method: "POST", jar, json: body });
+      const r = await call("/api/users", { method: "POST", jar, json: body });
       expect(r.status, JSON.stringify(body).slice(0, 60)).toBe(400);
     }
   });
@@ -262,6 +261,13 @@ describe("batas ukuran", () => {
 });
 
 describe("privilege escalation antar role", () => {
+  it("admin tidak bisa baca/tulis expenses maupun analytics finance", async () => {
+    const a = await login("admin@s.test");
+    expect((await call("/api/data/expenses", { jar: a.jar })).status).toBe(403);
+    expect((await call("/api/data/expenses/sync", { method: "POST", jar: a.jar, json: { changes: [{ op: "upsert", id: "ax", version: 0, data: {} }] } })).status).toBe(403);
+    expect((await call("/api/analytics", { jar: a.jar })).status).toBe(403);
+    expect((await call("/api/users", { jar: a.jar })).status).toBe(403);
+  });
   it("staff tak bisa tulis packages/expenses; viewer tak bisa tulis apa pun", async () => {
     const s = await login("staff@s.test");
     const v = await login("viewer@s.test");
@@ -273,22 +279,24 @@ describe("privilege escalation antar role", () => {
       expect((await call(`/api/data/${k}/sync`, { method: "POST", jar: v.jar, json: body })).status).toBe(403);
     }
   });
-  it("admin tidak bisa mengangkat diri/orang jadi owner, tidak bisa ubah owner", async () => {
+  it("admin tidak bisa mengelola user sama sekali (mengangkat diri/orang jadi owner, ubah owner)", async () => {
     const a = await login("admin@s.test");
-    const users = await call("/api/users", { jar: a.jar });
-    const owner = users.data.users.find((u: any) => u.role === "owner");
-    const adminU = users.data.users.find((u: any) => u.email === "admin@s.test");
-    const viewerU = users.data.users.find((u: any) => u.email === "viewer@s.test");
+    expect((await call("/api/users", { jar: a.jar })).status).toBe(403);
+    const rows = (await pool.query('select id, email, role from "user"')).rows as { id: string; email: string; role: string }[];
+    const owner = rows.find((u) => u.role === "owner")!;
+    const adminU = rows.find((u) => u.email === "admin@s.test")!;
+    const viewerU = rows.find((u) => u.email === "viewer@s.test")!;
     expect((await call(`/api/users/${owner.id}`, { method: "PATCH", jar: a.jar, json: { banned: true } })).status).toBe(403);
     expect((await call(`/api/users/${owner.id}`, { method: "PATCH", jar: a.jar, json: { name: "pwned" } })).status).toBe(403);
-    expect((await call(`/api/users/${adminU.id}`, { method: "PATCH", jar: a.jar, json: { role: "owner" } })).status).toBe(400);
+    expect((await call(`/api/users/${adminU.id}`, { method: "PATCH", jar: a.jar, json: { role: "owner" } })).status).toBe(403);
+    expect((await pool.query("select role from \"user\" where id=$1", [adminU.id])).rows[0].role).toBe("admin");
     expect((await call(`/api/users/${viewerU.id}`, { method: "PATCH", jar: a.jar, json: { role: "owner" } })).status).toBe(403);
     expect((await call(`/api/users/${viewerU.id}`, { method: "PATCH", jar: a.jar, json: { role: "admin" } })).status).toBe(403);
   });
-  it("admin tak bisa resend-invite ke owner", async () => {
+  it("admin tak bisa reset password owner", async () => {
     const a = await login("admin@s.test");
     const o = (await pool.query("select id from \"user\" where role='owner'")).rows[0].id;
-    expect((await call(`/api/users/${o}/resend-invite`, { method: "POST", jar: a.jar, json: {} })).status).toBe(403);
+    expect((await call(`/api/users/${o}/reset-password`, { method: "POST", jar: a.jar, json: { password: "password-panjang-1" } })).status).toBe(403);
   });
   it("cookie dipalsukan / session token acak ditolak", async () => {
     const r = await call("/api/me", { headers: { cookie: "better-auth.session_token=abc.def; __Secure-better-auth.session_token=abc.def" } });

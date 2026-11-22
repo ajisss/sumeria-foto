@@ -13,7 +13,8 @@
     "seed:owner": "tsx --env-file=.env.local server/scripts/seed-owner.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed:demo": "tsx --env-file=.env.local server/scripts/seed-demo.ts"
+    "seed:demo": "tsx --env-file=.env.local server/scripts/seed-demo.ts",
+    "create:user": "tsx --env-file=.env.local server/scripts/create-user.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.18",

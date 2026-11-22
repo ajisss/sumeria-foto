@@ -82,7 +82,7 @@ const AUTH_STR = {
     forgot_done: "Jika email terdaftar, tautan reset sudah dikirim. Cek inbox (dan folder spam). Tautan berlaku 1 jam.",
     back_login: "Kembali ke halaman masuk",
     reset_title: "Buat password baru",
-    reset_sub: "Password minimal 10 karakter. Dipakai juga untuk mengaktifkan akun yang baru diundang.",
+    reset_sub: "Password minimal 10 karakter.",
     new_password: "Password baru",
     confirm_password: "Ulangi password baru",
     reset_btn: "Simpan password",
@@ -114,7 +114,7 @@ const AUTH_STR = {
     forgot_done: "If the email is registered, a reset link has been sent. Check your inbox (and spam). The link is valid for 1 hour.",
     back_login: "Back to sign in",
     reset_title: "Set a new password",
-    reset_sub: "At least 10 characters. Also used to activate a newly invited account.",
+    reset_sub: "At least 10 characters.",
     new_password: "New password",
     confirm_password: "Repeat new password",
     reset_btn: "Save password",
@@ -360,10 +360,33 @@ function AuthGate({ onLogin, dark, toggleTheme, lang, changeLang }) {
   );
 }
 
-/* ---------- Kelola user (owner/admin) ---------- */
+/* ---------- Kelola user (owner saja) ---------- */
 
 const ROLE_LABEL = { owner: "Owner", admin: "Admin", staff: "Staff", viewer: "Viewer" };
-const MANAGEABLE = { owner: ["owner", "admin", "staff", "viewer"], admin: ["staff", "viewer"] };
+const MANAGEABLE = { owner: ["owner", "admin", "staff", "viewer"] };
+const ROLE_HINT = {
+  admin: "Admin: hanya menu Sales (quotation, invoice, orders, kalender, package item) dan Customer. Tanpa keuangan dan tanpa kelola user.",
+  staff: "Staff: customer, quotation, invoice. Tanpa pengeluaran.",
+  viewer: "Viewer: hanya melihat customer, quotation, invoice.",
+  owner: "Owner: semua akses termasuk keuangan dan kelola akun.",
+};
+
+/** Password acak 16 karakter tanpa karakter yang mudah tertukar (0/O, 1/l/I). */
+function genPassword() {
+  const chars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint32Array(16));
+  return Array.from(bytes, (n) => chars[n % chars.length]).join("");
+}
+
+function CredentialCard({ email, password, onCopy }) {
+  const h = React.createElement;
+  const row = (label, value) =>
+    h("div", { style: { display: "flex", justifyContent: "space-between", gap: 12, padding: "8px 0", fontSize: 13.5 } },
+      h("span", { style: { color: BRAND.inkSoft } }, label),
+      h("span", { style: { fontFamily: "ui-monospace,SFMono-Regular,Menlo,monospace", fontWeight: 600, wordBreak: "break-all", textAlign: "right" } }, value));
+  return h("div", { style: { border: `1px solid ${BRAND.line}`, borderRadius: 10, padding: "6px 14px", background: BRAND.grayBg } },
+    row("Email", email), row("Password", password));
+}
 
 function UsersPage({ ctx }) {
   const h = React.createElement;
@@ -371,11 +394,14 @@ function UsersPage({ ctx }) {
   const roles = MANAGEABLE[me.role] || [];
   const [users, setUsers] = useState(null);
   const [loadErr, setLoadErr] = useState("");
-  const [invite, setInvite] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", role: "staff" });
+  const [create, setCreate] = useState(false);
+  const [form, setForm] = useState({ name: "", email: "", role: "admin", password: "" });
   const [busy, setBusy] = useState(false);
   const [formErr, setFormErr] = useState("");
   const [confirm, setConfirm] = useState(null);
+  const [reset, setReset] = useState(null); // user yang password-nya direset
+  const [resetPw, setResetPw] = useState("");
+  const [creds, setCreds] = useState(null); // { email, password } setelah akun dibuat/direset (tampil sekali)
 
   async function load() {
     try {
@@ -398,18 +424,24 @@ function UsersPage({ ctx }) {
     }
   }
 
-  async function submitInvite(e) {
+  function openCreate() {
+    setForm({ name: "", email: "", role: "admin", password: genPassword() });
+    setFormErr("");
+    setCreate(true);
+  }
+
+  async function submitCreate(e) {
     e.preventDefault();
     if (busy) return;
     setFormErr("");
-    if (!EMAIL_RE.test(form.email)) return setFormErr("Email tidak valid.");
     if (!form.name.trim()) return setFormErr("Nama wajib diisi.");
+    if (!EMAIL_RE.test(form.email)) return setFormErr("Email tidak valid.");
+    if (form.password.length < 10) return setFormErr("Password minimal 10 karakter.");
     setBusy(true);
     try {
-      await apiFetch("/api/users/invite", { method: "POST", body: { name: form.name.trim(), email: form.email.trim(), role: form.role } });
-      ctx.showToast("Undangan dikirim ke " + form.email.trim());
-      setInvite(false);
-      setForm({ name: "", email: "", role: roles.includes("staff") ? "staff" : roles[0] });
+      await apiFetch("/api/users", { method: "POST", body: { name: form.name.trim(), email: form.email.trim(), role: form.role, password: form.password } });
+      setCreds({ email: form.email.trim().toLowerCase(), password: form.password });
+      setCreate(false);
       await load();
     } catch (x) {
       setFormErr(x.message);
@@ -417,6 +449,24 @@ function UsersPage({ ctx }) {
     setBusy(false);
   }
 
+  async function submitReset(e) {
+    e.preventDefault();
+    if (busy || !reset) return;
+    if (resetPw.length < 10) return ctx.showToast("Password minimal 10 karakter.", "error");
+    setBusy(true);
+    try {
+      await apiFetch("/api/users/" + reset.id + "/reset-password", { method: "POST", body: { password: resetPw } });
+      setCreds({ email: reset.email, password: resetPw });
+      setReset(null);
+    } catch (x) {
+      ctx.showToast(x.message || "Gagal", "error");
+    }
+    setBusy(false);
+  }
+
+  const copy = (text) => {
+    try { navigator.clipboard.writeText(text); ctx.showToast("Disalin"); } catch (_) { ctx.showToast("Gagal menyalin", "error"); }
+  };
   const manageable = (u) => u.id !== me.id && roles.includes(u.role);
 
   return h(
@@ -424,8 +474,8 @@ function UsersPage({ ctx }) {
     null,
     h(PageHeader, {
       title: "Pengguna",
-      subtitle: "Kelola akses tim. Akun dibuat lewat undangan email.",
-      action: h(Button, { icon: Plus, onClick: () => setInvite(true) }, "Undang pengguna"),
+      subtitle: "Kelola akses tim. Akun dibuat oleh owner dengan credential (email + password).",
+      action: h(Button, { icon: Plus, onClick: openCreate }, "Buat akun"),
     }),
     loadErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 13 } }, loadErr),
     !users && !loadErr && h("p", { style: { color: BRAND.inkSoft } }, "Memuat…"),
@@ -448,19 +498,35 @@ function UsersPage({ ctx }) {
               h(TableCell, null, h(Badge, { tone: u.banned ? "red" : "green" }, u.banned ? "Nonaktif" : "Aktif")),
               h(TableCell, { style: { textAlign: "right", whiteSpace: "nowrap" } },
                 h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
-                  manageable(u) && !u.banned && h(IconBtn, { icon: Mail, title: "Kirim ulang tautan", onClick: () => act(() => apiFetch("/api/users/" + u.id + "/resend-invite", { method: "POST", body: {} }), "Tautan dikirim ulang") }),
+                  manageable(u) && !u.banned && h(IconBtn, { icon: KeyRound, title: "Reset password", onClick: () => { setResetPw(genPassword()); setReset(u); } }),
                   manageable(u) && h(IconBtn, { icon: u.banned ? Check : Lock, tone: u.banned ? "default" : "danger", title: u.banned ? "Aktifkan" : "Nonaktifkan", onClick: () => setConfirm({ title: u.banned ? "Aktifkan akun" : "Nonaktifkan akun", message: u.banned ? `Aktifkan kembali ${u.email}?` : `Nonaktifkan ${u.email}? User ini langsung keluar dan tidak bisa masuk.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { banned: !u.banned } }), u.banned ? "Akun diaktifkan" : "Akun dinonaktifkan") }) })))))))),
-    invite &&
-      h(Modal, { title: "Undang pengguna", subtitle: "Kirim undangan email agar anggota tim bisa membuat akun.", icon: Users, onClose: () => setInvite(false), width: 440 },
-        h("form", { onSubmit: submitInvite, noValidate: true },
+    create &&
+      h(Modal, { title: "Buat akun", subtitle: "Isi credential untuk anggota tim. Password ditampilkan sekali setelah akun dibuat.", icon: Users, onClose: () => setCreate(false), width: 460 },
+        h("form", { onSubmit: submitCreate, noValidate: true },
           h(Field, { label: "Nama" }, h("input", { style: inputStyle, value: form.name, maxLength: 100, onChange: (e) => setForm({ ...form, name: e.target.value }), autoFocus: true })),
-          h(Field, { label: "Email" }, h("input", { style: inputStyle, type: "email", value: form.email, onChange: (e) => setForm({ ...form, email: e.target.value }) })),
+          h(Field, { label: "Email" }, h("input", { style: inputStyle, type: "email", autoComplete: "off", value: form.email, onChange: (e) => setForm({ ...form, email: e.target.value }) })),
           h(Field, { label: "Role" }, h(UiSelect, { style: inputStyle, value: form.role, onChange: (e) => setForm({ ...form, role: e.target.value }) }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))),
-          h("p", { style: { fontSize: 12, color: BRAND.inkSoft, lineHeight: 1.5 } }, "Staff: customer, quotation, invoice. Viewer: hanya lihat. Admin: semua data + kelola staff/viewer. Owner: semuanya."),
+          h(PwField, { label: "Password", value: form.password, autoComplete: "new-password", onChange: (e) => setForm({ ...form, password: e.target.value }) }),
+          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setForm({ ...form, password: genPassword() }), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, "Buat password acak")),
+          h("p", { style: { fontSize: 12, color: BRAND.inkSoft, lineHeight: 1.5 } }, ROLE_HINT[form.role]),
           formErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 12.5 } }, formErr),
           h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
-            h(Button, { variant: "secondary", icon: X, onClick: () => setInvite(false) }, "Batal"),
-            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Mengirim…" : "Kirim undangan")))),
+            h(Button, { variant: "secondary", icon: X, onClick: () => setCreate(false) }, "Batal"),
+            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Membuat…" : "Buat akun")))),
+    reset &&
+      h(Modal, { title: "Reset password", subtitle: reset.email + ". Sesi login user ini akan diakhiri.", icon: KeyRound, onClose: () => setReset(null), width: 440 },
+        h("form", { onSubmit: submitReset, noValidate: true },
+          h(PwField, { label: "Password baru", value: resetPw, autoComplete: "new-password", onChange: (e) => setResetPw(e.target.value) }),
+          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setResetPw(genPassword()), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, "Buat password acak")),
+          h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
+            h(Button, { variant: "secondary", icon: X, onClick: () => setReset(null) }, "Batal"),
+            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Menyimpan…" : "Reset password")))),
+    creds &&
+      h(Modal, { title: "Credential akun", subtitle: "Simpan sekarang. Password tidak akan ditampilkan lagi.", icon: Lock, onClose: () => setCreds(null), width: 440 },
+        h(CredentialCard, { email: creds.email, password: creds.password }),
+        h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 } },
+          h(Button, { variant: "secondary", icon: Check, onClick: () => setCreds(null) }, "Selesai"),
+          h(Button, { icon: Save, onClick: () => copy("Email: " + creds.email + "\nPassword: " + creds.password) }, "Salin credential"))),
     confirm &&
       h(Modal, { title: confirm.title, onClose: () => setConfirm(null), width: 420 },
         h("p", { style: { fontSize: 13.5, lineHeight: 1.5, color: BRAND.ink } }, confirm.message),

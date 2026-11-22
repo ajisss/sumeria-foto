@@ -117,7 +117,7 @@ analyticsRoutes.use("*", requireUser);
 
 analyticsRoutes.get("/", async (c) => {
   const role = c.get("user").role;
-  if (!can(role, "read:invoices")) throw new HTTPException(403, { message: "Tidak punya akses" });
+  if (!can(role, "read:invoices") || !can(role, "analytics:finance")) throw new HTTPException(403, { message: "Tidak punya akses" });
   const q = query.safeParse(c.req.query());
   if (!q.success) throw new HTTPException(400, { message: "Parameter tidak valid" });
   const canExpenses = can(role, "read:expenses");
