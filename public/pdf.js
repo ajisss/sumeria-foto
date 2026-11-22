@@ -17,8 +17,11 @@ const PDF_C = {
   paidFg: [24, 98, 62],
 };
 // Footer: kiri = alamat, kanan = kontak.
-const PDF_ADDRESS = ["Royal Tajur Residence", "Jl. Raya Tajur No. 170, Pakuan, Bogor Selatan", "Cluster Avebury 9 No. 17", "Bogor, Jawa Barat"];
-const PDF_CONTACT = ["Contact", "0851 3939 8639", "0813 4000 4073", "Instagram @Sumeriapoto"];
+const PDF_FOOTER_LINES = [
+  "Royal Tajur Residence",
+  "Jl. Raya Tajur No. 170, Pakuan, Bogor Selatan \u00B7 Cluster Avebury 9 No. 17 \u00B7 Bogor, Jawa Barat",
+  "Phone 0851 3939 8639 \u00B7 0813 4000 4073 \u00B7 Instagram @Sumeriapoto",
+];
 const PDF_BANK = { bank: "BCA", number: "8761141988", name: "Mochamad Annas Afan" };
 
 const PDF_M = 54; // margin kiri/kanan
@@ -136,7 +139,7 @@ function pdfTableHead(t, y) {
   return y + 24;
 }
 
-/** Footer setiap halaman: alamat (kiri), kontak (kanan), nomor halaman. Dipanggil setelah konten selesai. */
+/** Footer setiap halaman: alamat & kontak (satu baris panjang), nomor halaman. Dipanggil setelah konten selesai. */
 function pdfFooters(t) {
   const W = t.internal.pageSize.getWidth();
   const H = t.internal.pageSize.getHeight();
@@ -147,11 +150,9 @@ function pdfFooters(t) {
     const top = H - 92;
     pdfRule(t, PDF_M, W - PDF_M, top, PDF_C.rule, 0.6);
     pdfRule(t, PDF_M, PDF_M + 58, top, PDF_C.gold, 1.8);
-    [PDF_ADDRESS, PDF_CONTACT].forEach((lines, c) => {
-      lines.forEach((ln, i) =>
-        pdfTxt(t, ln, PDF_M + c * colW, top + 18 + i * 10.5, { size: 7.6, color: i === 0 ? PDF_C.ink : PDF_C.soft, style: i === 0 ? "bold" : "normal" }),
-      );
-    });
+    PDF_FOOTER_LINES.forEach((ln, i) =>
+      pdfTxt(t, ln, PDF_M, top + 18 + i * 11.5, { size: 7.8, color: i === 0 ? PDF_C.ink : PDF_C.soft, style: i === 0 ? "bold" : "normal" }),
+    );
     // Credit kecil di setiap halaman; nomor halaman sejajar di kanan.
     pdfTxt(t, "Created by Sumeriapoto Payhub", W / 2, H - 22, { size: 6.6, color: PDF_C.faint, align: "center", cs: 0.5 });
     if (n > 1) pdfTxt(t, `${p} / ${n}`, W - PDF_M, H - 22, { size: 7, color: PDF_C.faint, align: "right" });
