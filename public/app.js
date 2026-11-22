@@ -7014,6 +7014,14 @@ function PrintView({ target: o, onClose: a }) {
     l = e * 0.3,
     p = t === "invoice";
   return (
+    // Print / Save as PDF bawaan browser memakai document.title sebagai nama file -> samakan dengan format unduhan PDF.
+    useEffect(() => {
+      const prev = document.title;
+      document.title = pdfFileName(p ? r.invNumber : r.quoNumber, r).replace(/\.pdf$/, "");
+      return () => {
+        document.title = prev;
+      };
+    }, [p, r.invNumber, r.quoNumber]),
     useEffect(() => {
       if (n) {
         const d = setTimeout(() => window.print(), 400);
