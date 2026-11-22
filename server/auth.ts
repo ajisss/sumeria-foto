@@ -1,6 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { db, schema } from "./db/client.js";
 import { env, isProd } from "./env.js";
 import { sendResetPasswordEmail } from "./email.js";
@@ -65,6 +65,14 @@ function make() {
         "/request-password-reset": { window: 300, max: 3 },
         "/reset-password": { window: 300, max: 5 },
       },
+    },
+    hooks: {
+      // Foto profil hanya lewat PUT /api/me/avatar (divalidasi). Tolak `image` bebas (mis. URL eksternal) di update-user.
+      before: createAuthMiddleware(async (ctx) => {
+        if (ctx.path === "/update-user" && ctx.body && typeof ctx.body === "object" && "image" in ctx.body) {
+          throw new APIError("BAD_REQUEST", { message: "Foto profil diubah lewat menu Profile." });
+        }
+      }),
     },
     databaseHooks: {
       session: {
