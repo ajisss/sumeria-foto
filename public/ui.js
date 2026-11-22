@@ -159,6 +159,28 @@ const UI_CSS = `
   .cd-info span { font-size:12px; color:var(--c-inkSoft); }
   .cd-info b { font-weight:600; color:var(--c-ink); overflow-wrap:anywhere; }
   .ui-help { font-size:12px; color:var(--c-inkSoft); margin-top:6px; }
+
+  /* Mobile: tabel halaman berubah jadi kartu (satu baris = satu kartu, label kolom di kiri). Tabel di dalam modal
+     (editor item) tetap tabel biasa yang bisa digeser. Label diisi dari header kolom oleh Table (data-label). */
+  @media (max-width: 720px) {
+    .ui-tscroll { max-height:none !important; overflow:visible; }
+    .ui-table[data-cards] { display:block; }
+    .ui-table[data-cards] .ui-thead { display:none; }
+    .ui-table[data-cards] .ui-tbody { display:flex; flex-direction:column; gap:10px; padding:10px; }
+    .ui-table[data-cards] tr.ui-tr { display:block; border:1px solid var(--c-line); border-radius:12px; background:var(--c-surface); padding:2px 14px; }
+    .ui-table[data-cards] tr.ui-tr[data-pg-hide] { display:none; }
+    .ui-table[data-cards] .ui-tbody .ui-tr:hover { background:var(--c-surface); }
+    .ui-table[data-cards] td.ui-td { display:block; position:relative; min-height:32px; padding:7px 0 7px 42%; text-align:right; overflow-wrap:anywhere; border-bottom:1px dashed var(--c-line); }
+    .ui-table[data-cards] .ui-tbody .ui-tr .ui-td:last-child { border-bottom:none; }
+    .ui-table[data-cards] td.ui-td::before { content:attr(data-label); position:absolute; left:0; top:7px; width:38%; text-align:left; font-size:12px; font-weight:500; line-height:1.4; color:var(--c-inkSoft); }
+    .ui-table[data-cards] td.ui-td[data-label=""] { padding-left:0; }
+    .ui-table[data-cards] td.ui-td[data-label=""]::before { display:none; }
+    .ui-table[data-cards] td.ui-td:has(input, select, textarea) { text-align:left; }
+    .ui-table[data-cards] td.ui-td[colspan] { padding-left:0; text-align:center; }
+    .ui-table[data-cards] td.ui-td[colspan]::before { display:none; }
+    .ui-pager { justify-content:center; }
+    .icon-btn { width:40px !important; height:40px !important; min-width:40px !important; }
+  }
 `;
 
 const uiCx = (...a) => a.filter(Boolean).join(" ");
@@ -247,6 +269,10 @@ function Table({ className, children, paginate, fit: fitOn, ...p }) {
     if (!t) return;
     const heads = Array.from(t.querySelectorAll("thead tr:last-child > th"));
     const rows = Array.from(t.querySelectorAll("tbody > tr")).filter((r) => !Array.from(r.children).some((c) => c.colSpan > 1));
+    // Mode kartu di mobile: tiap sel membawa label kolomnya (tabel dalam modal tidak diubah jadi kartu).
+    if (t.closest(".modal-panel")) t.removeAttribute("data-cards");
+    else t.setAttribute("data-cards", "");
+    rows.forEach((r) => Array.from(r.children).forEach((c, i) => c.setAttribute("data-label", (heads[i] && heads[i].textContent.trim()) || "")));
     heads.forEach((th, i) => {
       const cells = rows.map((r) => r.children[i]).filter(Boolean);
       const num = cells.some((c) => (c.textContent || "").trim()) && !/phone|telp|\bhp\b|\bwa\b|whatsapp/i.test(th.textContent) && !/^(no\.?|#)$/i.test(th.textContent.trim()) && cells.every((c) => !c.querySelector("button,input,select,svg") && UI_NUM_RE.test((c.textContent || "").trim()));
