@@ -15,7 +15,7 @@ import { can } from "../rbac.js";
  * Expense hanya dihitung bila role punya `read:expenses`; kalau tidak, field-nya null.
  */
 
-type Rec = Record<string, unknown>;
+export type Rec = Record<string, unknown>;
 type Payment = { amount?: unknown; paid?: unknown; paidDate?: unknown; dueDate?: unknown };
 type Item = { packageItem?: unknown; qty?: unknown; unitPrice?: unknown; discount?: unknown; eventDate?: unknown };
 
@@ -88,7 +88,7 @@ function monthKeys(start: string, end: string) {
 
 type Range = { start: string; end: string };
 
-function metrics(invs: Rec[], exps: Rec[] | null, r: Range) {
+export function metrics(invs: Rec[], exps: Rec[] | null, r: Range) {
   const inR = (d: string) => !!d && d >= r.start && d <= r.end;
   let revenue = 0;
   let invoiced = 0;

@@ -15,6 +15,13 @@
       "when": 1794695547845,
       "tag": "0001_needy_randall",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795345997475,
+      "tag": "0002_sturdy_sister_grimm",
+      "breakpoints": true
     }
   ]
 }

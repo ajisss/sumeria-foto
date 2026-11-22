@@ -8,6 +8,7 @@ import { analyticsRoutes } from "./routes/analytics.js";
 import { cronRoutes } from "./routes/cron.js";
 import { dataRoutes } from "./routes/data.js";
 import { preferenceRoutes } from "./routes/preferences.js";
+import { targetRoutes } from "./routes/targets.js";
 import { userRoutes } from "./routes/users.js";
 
 export const app = new Hono<AppEnv>();
@@ -33,6 +34,7 @@ app.get("/api/me", requireUser, (c) => {
 app.route("/api/me/preferences", preferenceRoutes);
 app.route("/api/data", dataRoutes);
 app.route("/api/analytics", analyticsRoutes);
+app.route("/api/targets", targetRoutes);
 app.route("/api/users", userRoutes);
 app.route("/api/cron", cronRoutes);
 

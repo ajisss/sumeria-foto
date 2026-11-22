@@ -469,6 +469,15 @@ const Search = makeIcon(
       React.createElement("path", { d: "m3 7 9 6 9-6" }),
     ),
   ),
+  TargetIcon = makeIcon(
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+      React.createElement("circle", { cx: "12", cy: "12", r: "5" }),
+      React.createElement("circle", { cx: "12", cy: "12", r: "1" }),
+    ),
+  ),
   KeyRound = makeIcon(
     React.createElement(
       React.Fragment,
@@ -642,6 +651,7 @@ const Search = makeIcon(
       nav_expenses: "Expenses",
       nav_ledger: "Income & Expense",
       nav_margin: "Project Margin",
+      nav_targets: "Target",
       nav_packages: "Package Item",
       pkg_title: "Package Item",
       pkg_subtitle: "Katalog paket beserta harga default, dan laporan penjualan per paket.",
@@ -1035,6 +1045,7 @@ const Search = makeIcon(
       nav_expenses: "Expenses",
       nav_ledger: "Income & Expense",
       nav_margin: "Project Margin",
+      nav_targets: "Target",
       nav_packages: "Package Item",
       pkg_title: "Package Item",
       pkg_subtitle: "Package catalog with default prices, plus sales reports per package.",
@@ -1438,6 +1449,7 @@ const WA_ICON_DATA_URI =
     { key: "expenses", label: "Expenses", icon: Wallet },
     { key: "ledger", label: "Income & Expense", icon: ArrowLeftRight },
     { key: "margin", label: "Project Margin", icon: TrendingUp },
+    { key: "targets", label: "Target", icon: TargetIcon, perm: "targets:manage" },
     { key: "packages", label: "Package Item", icon: Package },
     { key: "users", label: "Pengguna", icon: Couple, perm: "users:manage" },
   ],
@@ -3142,6 +3154,10 @@ function PageRouter({ tab: o, ctx: a }) {
       return React.createElement(LedgerPage, { ctx: a });
     case "margin":
       return React.createElement(MarginPage, { ctx: a });
+    case "targets":
+      return a.can("targets:manage")
+        ? React.createElement(TargetsPage, { ctx: a })
+        : React.createElement(HomePage, { ctx: a });
     case "packages":
     case "bestsellers":
       return React.createElement(PackagesPage, { ctx: a });

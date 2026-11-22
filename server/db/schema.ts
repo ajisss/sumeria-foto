@@ -92,3 +92,11 @@ export const userPreferences = pgTable("user_preferences", {
   data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
+
+// Target omset per bulan (nilai rupiah). `month` berformat YYYY-MM. Hanya owner yang boleh membuat/mengubah.
+export const monthlyTargets = pgTable("monthly_targets", {
+  month: text("month").primaryKey(),
+  amount: bigint("amount", { mode: "number" }).notNull(),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});

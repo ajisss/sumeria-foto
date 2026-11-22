@@ -6,7 +6,7 @@ const SB_SECTIONS = [
   { key: "overview", items: ["home"] },
   { key: "sales", items: ["quotations", "invoices", "orders", "calendar", "packages"] },
   { key: "customers", items: ["customers"] },
-  { key: "finance", items: ["expenses", "ledger", "margin"] },
+  { key: "finance", items: ["expenses", "ledger", "margin", "targets"] },
   { key: "admin", items: ["users"] },
 ];
 
