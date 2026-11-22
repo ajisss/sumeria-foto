@@ -1126,31 +1126,48 @@ function TgBlock({ label, percent, revenue, target, full, kind, T }) {
       : h("div", { style: { fontSize: 13.5, color: BRAND.inkSoft, padding: "10px 0" } }, T.none_period));
 }
 
-/* Satu widget untuk target bulanan + tahunan. Server mengirim nominal hanya ke role dengan akses finance. */
+/* Satu widget untuk target bulanan + tahunan, dengan filter Bulan dan Tahun sendiri (terpisah dari filter tanggal halaman).
+   Tahun = tahun blok tahunan sekaligus tahun blok bulanan. Server mengirim nominal hanya ke role dengan akses finance. */
 function TargetWidget({ month, refresh, canManage, setTab, lang }) {
   const h = React.createElement;
   const T = TG_STR[lang === "en" ? "en" : "id"];
+  const [sel, setSel] = useState({ y: Number(month.slice(0, 4)), m: Number(month.slice(5, 7)) });
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
+  // ikuti filter tanggal halaman saat berubah (mis. pindah preset), tapi pilihan manual tetap dipakai selama tidak berubah
+  useEffect(() => { setSel({ y: Number(month.slice(0, 4)), m: Number(month.slice(5, 7)) }); }, [month]);
+  const key = sel.y + "-" + String(sel.m).padStart(2, "0");
   useEffect(() => {
     let alive = true;
-    apiFetch("/api/targets/progress?month=" + month)
+    apiFetch("/api/targets/progress?month=" + key)
       .then((r) => { if (alive) { setD(r); setErr(false); } })
       .catch(() => { if (alive) setErr(true); });
     return () => { alive = false; };
-  }, [month, refresh]);
+  }, [key, refresh]);
+
+  const nowY = new Date().getFullYear();
+  const yearOpts = Array.from({ length: 8 }, (_, i) => nowY - 2 + i);
+  if (!yearOpts.includes(sel.y)) yearOpts.push(sel.y);
+  yearOpts.sort((x, z) => x - z);
+  const monthName = (m) => new Date(2000, m - 1, 1).toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", { month: "long" });
+  const chip = (label, node) => h("div", { className: "an-chip" }, h("span", { className: "lbl" }, label), h("span", { className: "val" }, node));
+  const filters = h("div", { className: "an-filters", style: { marginLeft: "auto" } },
+    chip(T.month, h(ShSelect, { value: sel.m, onChange: (m) => setSel({ ...sel, m: Number(m) }), icon: "calendar", label: T.month, options: Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) })) })),
+    chip(T.year_lbl, h(ShSelect, { value: sel.y, onChange: (y) => setSel({ ...sel, y: Number(y) }), icon: "calendar", label: T.year_lbl, options: yearOpts.map((y) => ({ value: y, label: String(y) })) })));
+
   const full = !!d && d.target !== undefined; // ada nominal hanya untuk role dengan akses finance
   const hasAny = !!d && ((d.percent !== null && d.percent !== undefined) || (d.year && d.year.percent !== null && d.year.percent !== undefined));
+  const isNow = key === new Date().toISOString().slice(0, 7);
   return h("div", { className: "an-card" },
-    h("h3", null, T.widget),
+    h("div", { style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" } }, h("h3", { style: { margin: 0 } }, T.widget), filters),
     err ? h("div", { className: "an-empty" }, T.err)
     : !d ? h("div", { className: "an-empty" }, "…")
     : !hasAny
       ? h("div", { className: "an-empty", style: { display: "flex", flexDirection: "column", gap: 8, alignItems: "center" } },
           h("span", null, full ? T.none : T.none_admin),
           canManage && h(Button, { variant: "secondary", onClick: () => setTab("targets") }, T.set))
-      : h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28, marginTop: 6 } },
-          h(TgBlock, { label: T.month_lbl + " · " + tgMonthLabel(d.month, lang, true), percent: d.percent, revenue: d.revenue, target: d.target, full, kind: "month", T }),
+      : h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28, marginTop: 14 } },
+          h(TgBlock, { label: (isNow ? T.month_lbl + " · " : "") + tgMonthLabel(d.month, lang, true), percent: d.percent, revenue: d.revenue, target: d.target, full, kind: "month", T }),
           h(TgBlock, { label: T.year_lbl + " " + d.year.year, percent: d.year.percent, revenue: d.year.revenue, target: d.year.target, full, kind: "year", T })));
 }
 
