@@ -1,6 +1,8 @@
 import {
-  bigint, boolean, index, integer, jsonb, pgTable, primaryKey, text, timestamp,
+  bigint, boolean, customType, index, integer, jsonb, pgTable, primaryKey, text, timestamp,
 } from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
 // ---- Tabel Better Auth ----
 export const user = pgTable("user", {
@@ -98,5 +100,13 @@ export const monthlyTargets = pgTable("monthly_targets", {
   month: text("month").primaryKey(),
   amount: bigint("amount", { mode: "number" }).notNull(),
   updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// Foto profil (JPEG/PNG/WebP, sudah diperkecil di klien). Disajikan lewat GET /api/avatars/:userId (wajib login).
+export const userAvatars = pgTable("user_avatars", {
+  userId: text("user_id").primaryKey().references(() => user.id, { onDelete: "cascade" }),
+  mime: text("mime").notNull(),
+  data: bytea("data").notNull(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

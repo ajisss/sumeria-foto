@@ -121,7 +121,8 @@ const HD_CSS = (B) => `
   .hd-btn { position:relative; height:38px; min-width:38px; padding:0 10px; display:inline-flex; align-items:center; justify-content:center; gap:7px; border-radius:10px; border:1px solid ${B.line}; background:${B.surface}; color:${B.inkSoft}; cursor:pointer; font-size:12px; font-weight:600; font-family:inherit; }
   .hd-btn:hover { background:${B.grayBg}; color:${B.ink}; }
   .hd-dot { position:absolute; top:-5px; right:-5px; min-width:17px; height:17px; padding:0 4px; border-radius:9px; background:#D92D20; color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid ${B.surface}; }
-  .hd-avatar { width:26px; height:26px; border-radius:50%; background:var(--brand,#18181B); color:var(--on-brand,#fff); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
+  .hd-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+  .hd-avatar { overflow:hidden; width:26px; height:26px; border-radius:50%; background:var(--brand,#18181B); color:var(--on-brand,#fff); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; flex-shrink:0; }
   .hd-pop { position:absolute; top:calc(100% + 8px); right:0; z-index:70; min-width:300px; max-width:calc(100vw - 24px); background:${B.surface}; border:1px solid ${B.line}; border-radius:14px; box-shadow:0 18px 40px -16px rgba(0,0,0,.35); overflow:hidden; text-align:left; }
   .hd-pop-h { padding:12px 14px; font-size:13px; font-weight:600; color:${B.ink}; border-bottom:1px solid ${B.line}; display:flex; align-items:center; gap:8px; }
   .nd-ov { position:fixed; inset:0; z-index:92; background:rgba(0,0,0,.35); display:flex; justify-content:flex-end; animation:ndFade .15s ease-out; }
@@ -503,7 +504,7 @@ function AppHeader({ ctx, tab, dark, toggleTheme, lang, changeLang, onProfile, o
         h(
           "button",
           { className: "hd-btn", "aria-label": D.profile, "aria-expanded": open === "profile", onClick: () => setOpen(open === "profile" ? null : "profile"), style: { paddingLeft: 6 } },
-          h("span", { className: "hd-avatar" }, initials),
+          h("span", { className: "hd-avatar" }, user.image ? h("img", { src: user.image, alt: "" }) : initials),
           h("span", { className: "hd-name" }, first),
           hdIcon("chevron", 14),
         ),
@@ -511,7 +512,7 @@ function AppHeader({ ctx, tab, dark, toggleTheme, lang, changeLang, onProfile, o
           h(
             "div",
             { className: "hd-pop", role: "menu", style: { minWidth: 260 } },
-            h("div", { className: "hd-who" }, h("span", { className: "hd-avatar" }, initials), h("div", { style: { minWidth: 0 } }, h("b", null, name), user.role && h("span", null, D["role_" + user.role] || user.role))),
+            h("div", { className: "hd-who" }, h("span", { className: "hd-avatar" }, user.image ? h("img", { src: user.image, alt: "" }) : initials), h("div", { style: { minWidth: 0 } }, h("b", null, name), user.role && h("span", null, D["role_" + user.role] || user.role))),
             h("button", { className: "hd-item", role: "menuitem", onClick: go(onProfile) }, hdIcon("user", 16), D.profile),
             h("button", { className: "hd-item", role: "menuitem", onClick: go(onBackup) }, hdIcon("save", 16), D.backup),
             h("button", { className: "hd-item danger", role: "menuitem", onClick: go(onLogout) }, hdIcon("logout", 16), ctx.t("logout")),

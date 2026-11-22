@@ -4,7 +4,7 @@ import { auth } from "./auth.js";
 import { env } from "./env.js";
 import { can, isRole, type Permission, type Role } from "./rbac.js";
 
-export type AuthUser = { id: string; email: string; name: string; role: Role };
+export type AuthUser = { id: string; email: string; name: string; role: Role; image: string | null };
 export type AppEnv = { Variables: { user: AuthUser } };
 
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -36,7 +36,7 @@ export const requireUser: MiddlewareHandler<AppEnv> = async (c, next) => {
   const u = s.user as typeof s.user & { role?: unknown; banned?: unknown };
   if (u.banned) throw new HTTPException(403, { message: "Akun dinonaktifkan" });
   if (!isRole(u.role)) throw new HTTPException(403, { message: "Role tidak valid" });
-  c.set("user", { id: u.id, email: u.email, name: u.name, role: u.role });
+  c.set("user", { id: u.id, email: u.email, name: u.name, role: u.role, image: typeof u.image === "string" ? u.image : null });
   await next();
 };
 

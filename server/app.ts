@@ -5,6 +5,7 @@ import { auth } from "./auth.js";
 import { originGuard, requireUser, type AppEnv } from "./middleware.js";
 import { permissionsOf } from "./rbac.js";
 import { analyticsRoutes } from "./routes/analytics.js";
+import { avatarRoutes, avatarMeRoutes } from "./routes/avatars.js";
 import { cronRoutes } from "./routes/cron.js";
 import { dataRoutes } from "./routes/data.js";
 import { preferenceRoutes } from "./routes/preferences.js";
@@ -32,6 +33,8 @@ app.get("/api/me", requireUser, (c) => {
 });
 
 app.route("/api/me/preferences", preferenceRoutes);
+app.route("/api/me/avatar", avatarMeRoutes);
+app.route("/api/avatars", avatarRoutes);
 app.route("/api/data", dataRoutes);
 app.route("/api/analytics", analyticsRoutes);
 app.route("/api/targets", targetRoutes);

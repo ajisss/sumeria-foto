@@ -131,7 +131,7 @@ function DesktopSidebar({ tab, setTab, can, overdueCount, t, lang, lastBackupAt,
     h(
       "div",
       { className: "sb-top" },
-      h("div", { className: "sb-brand" }, h("img", { src: LOGO_DATA_URI, alt: "Sumériapoto" }), h("div", null, "PayHub")),
+      h("div", { className: "sb-brand" }, h("img", { src: LOGO_DATA_URI, alt: "Sumériapoto" })),
       h("button", { className: "sb-toggle", onClick: toggle, "aria-label": collapsed ? L.expand : L.collapse, title: collapsed ? L.expand : L.collapse }, sbIcon(collapsed ? "right" : "left")),
     ),
     h(

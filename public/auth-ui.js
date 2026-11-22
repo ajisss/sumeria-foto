@@ -584,6 +584,90 @@ function LegacyImportBanner({ items, ctx, onDone }) {
       h(Button, { onClick: doImport }, "Impor sekarang")));
 }
 
+/* ---------- Foto profil ---------- */
+
+const AVATAR_MAX_INPUT = 10 * 1024 * 1024; // file asli maks 10MB, lalu diperkecil
+const AVATAR_SIZE = 256;
+
+/** Potong tengah (persegi), perkecil ke 256x256, keluarkan JPEG data URL (~puluhan KB). Lempar Error bila bukan gambar. */
+async function avatarFromFile(file) {
+  if (!file || !/^image\/(jpeg|png|webp|gif|bmp|heic|heif)$/i.test(file.type || "")) throw new Error("type");
+  if (file.size > AVATAR_MAX_INPUT) throw new Error("size");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, no) => {
+      const i = new Image();
+      i.onload = () => ok(i);
+      i.onerror = () => no(new Error("decode"));
+      i.src = url;
+    });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    if (!side) throw new Error("decode");
+    const c = document.createElement("canvas");
+    c.width = c.height = AVATAR_SIZE;
+    const g = c.getContext("2d");
+    g.fillStyle = "#fff";
+    g.fillRect(0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, AVATAR_SIZE, AVATAR_SIZE);
+    return c.toDataURL("image/jpeg", 0.85);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Avatar + tombol ganti/hapus foto untuk modal Profile. `updateMe(patch)` memperbarui user di state aplikasi. */
+function AvatarEditor({ me, name, role, showToast, updateMe }) {
+  const h = React.createElement;
+  const [busy, setBusy] = useState(false);
+  const inputRef = useRef(null);
+  const user = me.user;
+  const initials = (user.name || user.email || "?").split(/\s+/).map((x) => x[0]).slice(0, 2).join("").toUpperCase();
+
+  async function onPick(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ""; // supaya file yang sama bisa dipilih ulang
+    if (!file) return;
+    setBusy(true);
+    try {
+      const image = await avatarFromFile(file);
+      const r = await apiFetch("/api/me/avatar", { method: "PUT", body: { image } });
+      updateMe({ image: r.image });
+      showToast("Foto profil diperbarui");
+    } catch (x) {
+      const m = x.message === "type" ? "File harus berupa gambar (JPG, PNG, atau WebP)." : x.message === "size" ? "Ukuran foto maksimal 10MB." : x.message === "decode" ? "Foto tidak bisa dibaca. Coba format JPG atau PNG." : x.message || "Gagal mengunggah foto";
+      showToast(m, "error");
+    }
+    setBusy(false);
+  }
+  async function onRemove() {
+    setBusy(true);
+    try {
+      await apiFetch("/api/me/avatar", { method: "DELETE" });
+      updateMe({ image: null });
+      showToast("Foto profil dihapus");
+    } catch (x) {
+      showToast(x.message || "Gagal menghapus foto", "error");
+    }
+    setBusy(false);
+  }
+
+  const circle = {
+    width: 72, height: 72, borderRadius: "50%", flexShrink: 0, overflow: "hidden", position: "relative",
+    background: BRAND.blueFaint, border: `1px solid ${BRAND.line}`, display: "flex", alignItems: "center", justifyContent: "center",
+    color: BRAND.ink, fontSize: 24, fontWeight: 700, padding: 0, cursor: busy ? "wait" : "pointer",
+  };
+  return h("div", { style: { display: "flex", alignItems: "center", gap: 14, marginBottom: 20 } },
+    h("button", { type: "button", style: circle, onClick: () => inputRef.current && inputRef.current.click(), disabled: busy, "aria-label": "Ganti foto profil", title: "Ganti foto profil" },
+      user.image ? h("img", { src: user.image, alt: "", style: { width: "100%", height: "100%", objectFit: "cover", display: "block" } }) : initials),
+    h("div", { style: { minWidth: 0 } },
+      h("div", { style: { fontSize: 13.5, fontWeight: 700, color: BRAND.ink, wordBreak: "break-all" } }, name),
+      h("div", { style: { fontSize: 11.5, color: BRAND.inkSoft, marginTop: 2 } }, role),
+      h("div", { style: { display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" } },
+        h(Button, { variant: "secondary", icon: Upload, disabled: busy, onClick: () => inputRef.current && inputRef.current.click() }, busy ? "Memproses…" : "Ganti foto"),
+        user.image && h(Button, { variant: "ghost", icon: Trash2, disabled: busy, onClick: onRemove }, "Hapus"))),
+    h("input", { ref: inputRef, type: "file", accept: "image/jpeg,image/png,image/webp,image/gif,image/bmp", onChange: onPick, style: { display: "none" }, "aria-hidden": true, tabIndex: -1 }));
+}
+
 /* ---------- Akun sendiri: ganti nama & password ---------- */
 
 function PwField({ label, value, onChange, autoComplete }) {

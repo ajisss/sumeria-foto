@@ -2023,6 +2023,7 @@ function App() {
             React.createElement(MainApp, {
               me: o,
               email: o.user.email,
+              updateMe: (patch) => a((m) => (m ? { ...m, user: { ...m.user, ...patch } } : m)),
               onLogout: C,
               dark: t,
               toggleTheme: y,
@@ -2055,6 +2056,7 @@ function MainApp({
   lang: n,
   changeLang: e,
   t: l,
+  updateMe,
 }) {
   const [askOut, setAskOut] = useState(!1);
   const perms = ME.permissions || [],
@@ -2287,55 +2289,13 @@ function MainApp({
       React.createElement(
         Modal,
         { title: "Profile", subtitle: l("profile_sub"), onClose: () => setPR(!1), width: 460, icon: UserCircle },
-        React.createElement(
-          "div",
-          {
-            style: {
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              marginBottom: 20,
-            },
-          },
-          React.createElement(
-            "div",
-            {
-              style: {
-                width: 72,
-                height: 72,
-                borderRadius: "50%",
-                background: BRAND.blueFaint,
-                border: `1px solid ${BRAND.line}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: BRAND.ink,
-              },
-            },
-            React.createElement(UserCircle, { size: 24 }),
-          ),
-          React.createElement(
-            "div",
-            { style: { minWidth: 0 } },
-            React.createElement(
-              "div",
-              {
-                style: {
-                  fontSize: 13.5,
-                  fontWeight: 700,
-                  color: BRAND.ink,
-                  wordBreak: "break-all",
-                },
-              },
-              o,
-            ),
-            React.createElement(
-              "div",
-              { style: { fontSize: 11.5, color: BRAND.inkSoft, marginTop: 2 } },
-              ROLE_LABEL[ME.user.role] || ME.user.role,
-            ),
-          ),
-        ),
+        React.createElement(AvatarEditor, {
+          me: ME,
+          name: o,
+          role: ROLE_LABEL[ME.user.role] || ME.user.role,
+          showToast,
+          updateMe,
+        }),
         React.createElement(AccountPanel, { me: ME, showToast }),
       ),
     BK &&
@@ -2624,19 +2584,6 @@ function Sidebar({
                   filter: e ? "invert(1)" : "none",
                 },
               }),
-              React.createElement(
-                "div",
-                {
-                  style: {
-                    fontSize: 10.5,
-                    letterSpacing: "0.16em",
-                    textTransform: "uppercase",
-                    color: BRAND.inkSoft,
-                    marginTop: 7,
-                  },
-                },
-                "PayHub",
-              ),
             ),
             React.createElement(
               "button",
@@ -3722,19 +3669,6 @@ function HomePage({ ctx: o }) {
         className: "ph-logo-invert",
         style: { height: 22, width: "auto", display: "block" },
       }),
-      React.createElement(
-        "div",
-        {
-          style: {
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: BRAND.inkSoft,
-          },
-        },
-        "PayHub",
-      ),
     ),
     React.createElement(
       "div",
