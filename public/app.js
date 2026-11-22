@@ -7704,10 +7704,20 @@ function PrintView({ target: o, onClose: a }) {
     )
   );
 }
+// Nama file PDF: "INV001_Ambon" / "QUO001_Ambon" (nomor tanpa tahun + nama customer).
+function pdfFileName(num, o) {
+  const parts = String(num || "").split("/"),
+    code = parts.length >= 2 ? parts[0] + parts[1] : parts.join(""),
+    cust = String((o.customerSnap && o.customerSnap.name) || "")
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  return (code || "Sumeriapoto") + (cust ? "_" + cust : "") + ".pdf";
+}
 function downloadInvoicePdf(o) {
   const a = buildInvoicePdf(o),
-    r =
-      "Invoice-" + (o.invNumber || "Sumeriapoto").split("/").join("-") + ".pdf";
+    r = pdfFileName(o.invNumber, o);
   return (a.save(r), r);
 }
 function sendInvoiceWhatsApp(o) {
@@ -7738,10 +7748,7 @@ Tim Sumeriapoto`;
 }
 function downloadQuotationPdf(o) {
   const a = buildQuotationPdf(o),
-    r =
-      "Quotation-" +
-      (o.quoNumber || "Sumeriapoto").split("/").join("-") +
-      ".pdf";
+    r = pdfFileName(o.quoNumber, o);
   return (a.save(r), r);
 }
 async function sendQuotationWhatsApp(o) {
@@ -7751,7 +7758,7 @@ async function sendQuotationWhatsApp(o) {
      menu Share (Mac/HP) bisa mengirim PDF + teks sekaligus ke WhatsApp. Nomor tujuan dipilih di WhatsApp. */
   try {
     const pdf = buildQuotationPdf(o),
-      file = new File([pdf.output("blob")], "Quotation-" + (o.quoNumber || "Sumeriapoto").split("/").join("-") + ".pdf", {
+      file = new File([pdf.output("blob")], pdfFileName(o.quoNumber, o), {
         type: "application/pdf",
       });
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
