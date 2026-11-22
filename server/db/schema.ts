@@ -95,7 +95,8 @@ export const userPreferences = pgTable("user_preferences", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Target omset per bulan (nilai rupiah). `month` berformat YYYY-MM. Hanya owner yang boleh membuat/mengubah.
+// Target omset (rupiah). Kolom `month` memuat kunci periode: "YYYY-MM" = target bulanan, "YYYY" = target tahunan.
+// Hanya owner yang boleh membuat/mengubah.
 export const monthlyTargets = pgTable("monthly_targets", {
   month: text("month").primaryKey(),
   amount: bigint("amount", { mode: "number" }).notNull(),

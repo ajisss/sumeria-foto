@@ -96,22 +96,64 @@ describe("target omset bulanan", () => {
     expect(list.data.months.find((m: any) => m.month === "2026-02")).toMatchObject({ target: 2_000_000, revenue: 500_000, percent: 25 });
     expect(list.data.months.find((m: any) => m.month === "2026-04")).toMatchObject({ target: null, revenue: 0, percent: null });
     const p = await call("/api/targets/progress?month=2026-03", { jar });
-    expect(p.data).toEqual({ month: "2026-03", target: 10_000_000, revenue: 2_000_000, percent: 20 });
+    expect(p.data).toEqual({
+      month: "2026-03", target: 10_000_000, revenue: 2_000_000, percent: 20,
+      year: { year: "2026", target: null, revenue: 0, percent: null }, // belum ada target tahunan
+    });
   });
 
   it("admin hanya menerima persen: tanpa nominal target maupun omset", async () => {
     const jar = await login("admin@t.test");
     const p = await call("/api/targets/progress?month=2026-03", { jar });
     expect(p.status).toBe(200);
-    expect(p.data).toEqual({ month: "2026-03", percent: 20 });
+    expect(p.data).toEqual({ month: "2026-03", percent: 20, year: { year: "2026", percent: null } });
     expect(JSON.stringify(p.data)).not.toMatch(/target|revenue|10000000|2000000/);
     // bulan tanpa target: persen null, tidak membocorkan apa pun
-    expect((await call("/api/targets/progress?month=2026-04", { jar })).data).toEqual({ month: "2026-04", percent: null });
+    expect((await call("/api/targets/progress?month=2026-04", { jar })).data).toEqual({ month: "2026-04", percent: null, year: { year: "2026", percent: null } });
   });
 
   it("role dengan analytics:finance (viewer) melihat nominal", async () => {
     const jar = await login("viewer@t.test");
     expect((await call("/api/targets/progress?month=2026-03", { jar })).data).toMatchObject({ target: 10_000_000, revenue: 2_000_000, percent: 20 });
+  });
+
+  it("target tahunan: owner membuat, realisasi = total pembayaran paid setahun, muncul di list dan progress", async () => {
+    const owner = await login("owner@t.test");
+    // Maret 2.000.000 + Feb 500.000 = 2.500.000 di 2026
+    expect((await call("/api/targets/2026", { method: "PUT", jar: owner, json: { amount: 50_000_000 } })).status).toBe(200);
+    const list = await call("/api/targets?year=2026", { jar: owner });
+    expect(list.data.yearly).toEqual({ period: "2026", target: 50_000_000, revenue: 2_500_000, percent: 5 });
+    const p = await call("/api/targets/progress?month=2026-03", { jar: owner });
+    expect(p.data.year).toEqual({ year: "2026", target: 50_000_000, revenue: 2_500_000, percent: 5 });
+    // target bulanan dan tahunan terpisah: bulan tetap memakai target bulannya
+    expect(p.data.target).toBe(10_000_000);
+    // tahun lain tidak punya target
+    expect((await call("/api/targets?year=2025", { jar: owner })).data.yearly).toMatchObject({ target: null, percent: null });
+    expect((await pool.query("select amount from monthly_targets where month='2026'")).rows[0].amount).toBe("50000000");
+  });
+
+  it("admin: persen tahunan saja, tanpa nominal; tidak bisa mengubah target tahunan", async () => {
+    const jar = await login("admin@t.test");
+    const p = await call("/api/targets/progress?month=2026-03", { jar });
+    expect(p.data.year).toEqual({ year: "2026", percent: 5 });
+    expect(JSON.stringify(p.data)).not.toMatch(/50000000|2500000|revenue|target/);
+    expect((await call("/api/targets/2026", { method: "PUT", jar, json: { amount: 1 } })).status).toBe(403);
+    expect((await call("/api/targets/2026", { method: "DELETE", jar })).status).toBe(403);
+  });
+
+  it("validasi periode: tahun harus 4 digit, bulan 01-12", async () => {
+    const jar = await login("owner@t.test");
+    for (const k of ["26", "20266", "2026-13", "2026-1", "abcd", "2026-03-01"]) {
+      expect((await call(`/api/targets/${k}`, { method: "PUT", jar, json: { amount: 1000 } })).status, k).toBe(400);
+      expect((await call(`/api/targets/${k}`, { method: "DELETE", jar })).status, "del " + k).toBe(400);
+    }
+    expect((await call("/api/targets/2027", { method: "PUT", jar, json: { amount: 0 } })).status).toBe(400);
+  });
+
+  it("hapus target tahunan", async () => {
+    const jar = await login("owner@t.test");
+    expect((await call("/api/targets/2026", { method: "DELETE", jar })).status).toBe(200);
+    expect((await call("/api/targets/progress?month=2026-03", { jar })).data.year.target).toBeNull();
   });
 
   it("persen bisa lebih dari 100 bila melampaui target", async () => {
