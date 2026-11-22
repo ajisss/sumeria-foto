@@ -3976,7 +3976,8 @@ function CustomerDetailModal({ customer: o, ctx: a, onClose: t }) {
             h(Table, { paginate: !1 }, h(TableHeader, null, h(TableRow, null, heads.map((x) => h(TableHead, { key: x }, x)))), h(TableBody, null, rows)),
           ),
     nw = { whiteSpace: "nowrap" },
-    info = (k, val) => h("div", { className: "cd-info" }, h("span", null, k), h("b", null, val || "—"));
+    info = (k, val) => h("div", { className: "cd-info" }, h("span", null, k), h("b", null, val || "—")),
+    stat = (label, value, tone, Ic) => h("div", { className: "cd-stat " + tone }, h("span", { className: "cd-stat-ic" }, h(Ic, { size: 16 })), h("span", { className: "cd-stat-l" }, label), h("b", { className: "cd-stat-v" }, value));
   return h(
     Modal,
     { title: e("cust_detail_title"), onClose: t, width: 760, icon: Users, subtitle: `${o.name}${o.city ? " · " + o.city : ""}` },
@@ -3994,14 +3995,14 @@ function CustomerDetailModal({ customer: o, ctx: a, onClose: t }) {
         h(
           "div",
           null,
-          h("div", { className: "cd-infos" }, info(e("detail_gender"), o.gender), info(e("detail_phone"), o.phone), info(e("detail_email"), o.email), info(e("detail_city"), o.city)),
+          h("div", { className: "cd-infos" }, info(e("detail_gender"), o.gender), info(e("detail_phone"), o.phone), info(e("detail_email"), o.email), info(e("detail_city"), o.city), h("div", { className: "cd-info cd-pic" }, h("span", null, e("cust_col_pic")), h("b", null, (o.pic && o.pic.name) || "—"))),
           h(
             "div",
-            { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px,1fr))", gap: 12, marginTop: 16 } },
-            h(StatCard, { label: e("detail_revenue"), value: fmtRp(f), tone: "green", icon: TrendingUp }),
-            h(StatCard, { label: e("detail_outstanding"), value: fmtRp(u), tone: u > 0 ? "amber" : "gray", icon: Wallet }),
-            h(StatCard, { label: e("detail_quotations"), value: String(l.length), tone: "blue", icon: FileText }),
-            h(StatCard, { label: e("detail_invoices"), value: String(p.length), tone: "blue", icon: Receipt }),
+            { className: "cd-stats" },
+            stat(e("detail_revenue"), fmtRp(f), "green", TrendingUp),
+            stat(e("detail_outstanding"), fmtRp(u), u > 0 ? "amber" : "gray", Wallet),
+            stat(e("detail_quotations"), String(l.length), "blue", FileText),
+            stat(e("detail_invoices"), String(p.length), "blue", Receipt),
           ),
         ),
       tab === "invoices" &&
