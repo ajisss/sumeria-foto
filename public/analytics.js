@@ -1085,8 +1085,8 @@ const TG_STR = {
     title: "Target", subtitle: "Atur target omset bulanan. Realisasi dihitung dari pembayaran invoice yang sudah paid.",
     year: "Tahun", month: "Bulan", target: "Target", real: "Realisasi", progress: "Pencapaian", edit: "Atur target",
     modal_sub: "Target omset bulan ini (rupiah).", amount: "Target (Rp)", save: "Simpan", cancel: "Batal", saved: "Target disimpan", removed: "Target dihapus",
-    del_msg: (m) => `Target ${m} akan dihapus.`, err: "Gagal memuat target", bad: "Isi target dengan angka lebih dari 0.", empty: "Belum diatur",
-    total: "Total tahun ini",
+    del_msg: (m) => `${m} akan dihapus.`, target_of: (m) => `Target ${m}`, err: "Gagal memuat target", bad: "Isi target dengan angka lebih dari 0.", empty: "Belum diatur",
+    total: "Total target bulanan", yearly: "Target tahunan", monthly: "Target bulanan", month_lbl: "Bulan ini", year_lbl: "Tahun", yearly_sub: "Target omset satu tahun penuh, terpisah dari target bulanan.", none_period: "Belum ada target",
   },
   en: {
     widget: "Revenue target", set: "Set target", none: "No target set for this month", none_admin: "This month's target hasn't been set",
@@ -1094,8 +1094,8 @@ const TG_STR = {
     title: "Targets", subtitle: "Set monthly revenue targets. Actual revenue is counted from paid invoice payments.",
     year: "Year", month: "Month", target: "Target", real: "Actual", progress: "Progress", edit: "Set target",
     modal_sub: "Revenue target for this month (rupiah).", amount: "Target (Rp)", save: "Save", cancel: "Cancel", saved: "Target saved", removed: "Target removed",
-    del_msg: (m) => `The ${m} target will be removed.`, err: "Failed to load targets", bad: "Enter a target greater than 0.", empty: "Not set",
-    total: "Total this year",
+    del_msg: (m) => `${m} will be removed.`, target_of: (m) => `Target for ${m}`, err: "Failed to load targets", bad: "Enter a target greater than 0.", empty: "Not set",
+    total: "Total monthly targets", yearly: "Yearly target", monthly: "Monthly targets", month_lbl: "This month", year_lbl: "Year", yearly_sub: "Revenue target for the full year, separate from the monthly targets.", none_period: "No target yet",
   },
 };
 
@@ -1109,6 +1109,21 @@ function TgBar({ percent }) {
     h("div", { style: { width: Math.min(100, Math.max(0, percent || 0)) + "%", height: "100%", background: done ? "#1F7A4D" : "var(--an-1)", borderRadius: 6, transition: "width .3s" } }));
 }
 
+function TgBlock({ label, percent, revenue, target, full, T }) {
+  const h = React.createElement;
+  const has = percent !== null && percent !== undefined;
+  return h("div", { style: { minWidth: 0 } },
+    h("div", { style: { fontSize: 13, color: BRAND.inkSoft, marginBottom: 4 } }, label),
+    has
+      ? [
+          h("p", { className: "an-big", key: "p", style: { margin: "0 0 2px" } }, tgPct(percent), h("span", { style: { fontSize: 13, fontWeight: 400, color: BRAND.inkSoft, marginLeft: 8 } }, T.achieved)),
+          h("div", { key: "b", style: { margin: "6px 0 8px" } }, h(TgBar, { percent })),
+          full && h("div", { key: "n", style: { fontSize: 13, color: BRAND.inkSoft } }, fmtRp(revenue) + " " + T.of + " " + fmtRp(target)),
+        ]
+      : h("div", { style: { fontSize: 13.5, color: BRAND.inkSoft, padding: "10px 0" } }, T.none_period));
+}
+
+/* Satu widget untuk target bulanan + tahunan. Server mengirim nominal hanya ke role dengan akses finance. */
 function TargetWidget({ month, refresh, canManage, setTab, lang }) {
   const h = React.createElement;
   const T = TG_STR[lang === "en" ? "en" : "id"];
@@ -1121,21 +1136,19 @@ function TargetWidget({ month, refresh, canManage, setTab, lang }) {
       .catch(() => { if (alive) setErr(true); });
     return () => { alive = false; };
   }, [month, refresh]);
-  const hasTarget = d && d.percent !== null && d.percent !== undefined;
-  const full = d && d.target !== undefined; // ada nominal hanya untuk role dengan akses finance
+  const full = !!d && d.target !== undefined; // ada nominal hanya untuk role dengan akses finance
+  const hasAny = !!d && ((d.percent !== null && d.percent !== undefined) || (d.year && d.year.percent !== null && d.year.percent !== undefined));
   return h("div", { className: "an-card" },
-    h("h3", null, T.widget + " · " + tgMonthLabel(month, lang, true)),
+    h("h3", null, T.widget),
     err ? h("div", { className: "an-empty" }, T.err)
     : !d ? h("div", { className: "an-empty" }, "…")
-    : !hasTarget
+    : !hasAny
       ? h("div", { className: "an-empty", style: { display: "flex", flexDirection: "column", gap: 8, alignItems: "center" } },
           h("span", null, full ? T.none : T.none_admin),
           canManage && h(Button, { variant: "secondary", onClick: () => setTab("targets") }, T.set))
-      : [
-          h("p", { className: "an-big", key: "p" }, tgPct(d.percent), h("span", { style: { fontSize: 13, fontWeight: 400, color: BRAND.inkSoft, marginLeft: 8 } }, T.achieved)),
-          h("div", { key: "b", style: { margin: "6px 0 10px" } }, h(TgBar, { percent: d.percent })),
-          full && h("div", { key: "n", style: { fontSize: 13, color: BRAND.inkSoft } }, fmtRp(d.revenue) + " " + T.of + " " + fmtRp(d.target)),
-        ]);
+      : h("div", { style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 28, marginTop: 6 } },
+          h(TgBlock, { label: T.month_lbl + " · " + tgMonthLabel(d.month, lang, true), percent: d.percent, revenue: d.revenue, target: d.target, full, T }),
+          h(TgBlock, { label: T.year_lbl + " " + d.year.year, percent: d.year.percent, revenue: d.year.revenue, target: d.year.target, full, T })));
 }
 
 function TargetsPage({ ctx }) {
@@ -1146,8 +1159,8 @@ function TargetsPage({ ctx }) {
   const [year, setYear] = useState(nowY);
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
-  const [edit, setEdit] = useState(null); // { month, digits }
-  const [del, setDel] = useState(null);
+  const [edit, setEdit] = useState(null); // { key: "YYYY" | "YYYY-MM", digits }
+  const [del, setDel] = useState(null);   // { key, label }
   const [busy, setBusy] = useState(false);
 
   async function load() {
@@ -1160,6 +1173,8 @@ function TargetsPage({ ctx }) {
   }
   useEffect(() => { load(); }, [year, ctx.invoices]);
 
+  const keyLabel = (k) => (k.length === 4 ? T.yearly + " " + k : tgMonthLabel(k, lang, true));
+  const delLabel = (k) => (k.length === 4 ? T.yearly + " " + k : T.target_of(tgMonthLabel(k, lang, true)));
   const fmtDigits = (s) => (s ? Number(s).toLocaleString("id-ID") : "");
   async function save(e) {
     e.preventDefault();
@@ -1167,7 +1182,7 @@ function TargetsPage({ ctx }) {
     if (!Number.isInteger(amount) || amount < 1) return ctx.showToast(T.bad, "error");
     setBusy(true);
     try {
-      await apiFetch("/api/targets/" + edit.month, { method: "PUT", body: { amount } });
+      await apiFetch("/api/targets/" + edit.key, { method: "PUT", body: { amount } });
       ctx.showToast(T.saved);
       setEdit(null);
       await load();
@@ -1176,9 +1191,9 @@ function TargetsPage({ ctx }) {
     }
     setBusy(false);
   }
-  async function remove(m) {
+  async function remove(k) {
     try {
-      await apiFetch("/api/targets/" + m, { method: "DELETE" });
+      await apiFetch("/api/targets/" + k, { method: "DELETE" });
       ctx.showToast(T.removed);
       setDel(null);
       await load();
@@ -1188,9 +1203,13 @@ function TargetsPage({ ctx }) {
   }
 
   const months = data ? data.months : [];
+  const yr = data ? data.yearly : null;
   const sumT = months.reduce((s, m) => s + (m.target || 0), 0);
   const sumR = months.filter((m) => m.target).reduce((s, m) => s + m.revenue, 0);
   const years = Array.from({ length: 8 }, (_, i) => nowY - 2 + i); // tahun ini -2 sampai +5
+  const actions = (key, target) => h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
+    h(IconBtn, { icon: Pencil, title: T.edit, onClick: () => setEdit({ key, digits: target ? String(target) : "" }) }),
+    target && h(IconBtn, { icon: Trash2, tone: "danger", title: ctx.t("delete"), onClick: () => setDel({ key, label: delLabel(key) }) }));
 
   return h("div", { className: "an" },
     h("style", null, AN_CSS(BRAND)),
@@ -1203,6 +1222,18 @@ function TargetsPage({ ctx }) {
     }),
     err && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 13 } }, err),
     !data && !err && h("p", { style: { color: BRAND.inkSoft } }, "…"),
+    yr && h("div", { className: "an-card", style: { marginBottom: 18, display: "flex", alignItems: "center", gap: 24, flexWrap: "wrap", justifyContent: "space-between" } },
+      h("div", { style: { minWidth: 200 } },
+        h("h3", { style: { margin: "0 0 4px" } }, T.yearly + " " + year),
+        h("div", { style: { fontSize: 12.5, color: BRAND.inkSoft } }, T.yearly_sub)),
+      h("div", { style: { display: "flex", gap: 28, alignItems: "center", flexWrap: "wrap", flex: 1, justifyContent: "flex-end" } },
+        h("div", null, h("div", { style: { fontSize: 12, color: BRAND.inkSoft } }, T.target), h("div", { style: { fontWeight: 700, fontSize: 16, color: yr.target ? undefined : BRAND.inkSoft } }, yr.target ? fmtRp(yr.target) : T.empty)),
+        h("div", null, h("div", { style: { fontSize: 12, color: BRAND.inkSoft } }, T.real), h("div", { style: { fontWeight: 700, fontSize: 16 } }, fmtRp(yr.revenue))),
+        h("div", { style: { minWidth: 170 } },
+          h("div", { style: { fontSize: 12, color: BRAND.inkSoft, marginBottom: 4 } }, T.progress),
+          yr.target ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: yr.percent })), h("span", { style: { fontWeight: 700, minWidth: 48, textAlign: "right" } }, tgPct(yr.percent))) : "—"),
+        actions(String(year), yr.target))),
+    data && h("h3", { style: { margin: "6px 0 10px", fontSize: 14, color: BRAND.inkSoft, fontWeight: 600 } }, T.monthly + " " + year),
     data && h(Card, { style: { padding: 0, overflowX: "auto" } }, h(Table, { paginate: false },
       h(TableHeader, null, h(TableRow, null,
         h(TableHead, null, T.month), h(TableHead, null, T.target), h(TableHead, null, T.real), h(TableHead, { style: { minWidth: 180 } }, T.progress), h(TableHead, { style: { width: 100 } }))),
@@ -1214,20 +1245,18 @@ function TargetsPage({ ctx }) {
           h(TableCell, null, m.target
             ? h("div", { style: { display: "flex", alignItems: "center", gap: 10 } }, h("div", { style: { flex: 1 } }, h(TgBar, { percent: m.percent })), h("span", { style: { fontWeight: 600, minWidth: 48, textAlign: "right" } }, tgPct(m.percent)))
             : "—"),
-          h(TableCell, null, h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
-            h(IconBtn, { icon: Pencil, title: T.edit, onClick: () => setEdit({ month: m.month, digits: m.target ? String(m.target) : "" }) }),
-            m.target && h(IconBtn, { icon: Trash2, tone: "danger", title: ctx.t("delete"), onClick: () => setDel(m) }))))),
+          h(TableCell, null, actions(m.month, m.target)))),
         h(TableRow, { key: "sum" },
           h(TableCell, { style: { fontWeight: 700 } }, T.total),
           h(TableCell, { style: { fontWeight: 700, whiteSpace: "nowrap" } }, fmtRp(sumT)),
           h(TableCell, { style: { fontWeight: 700, whiteSpace: "nowrap" } }, fmtRp(sumR)),
           h(TableCell, { style: { fontWeight: 700 } }, sumT ? tgPct(Math.round((sumR / sumT) * 1000) / 10) : "—"),
           h(TableCell, null))))),
-    edit && h(Modal, { title: T.title + " · " + tgMonthLabel(edit.month, lang, true), subtitle: T.modal_sub, icon: TrendingUp, onClose: () => setEdit(null), width: 420 },
+    edit && h(Modal, { title: keyLabel(edit.key), subtitle: edit.key.length === 4 ? T.yearly_sub : T.modal_sub, icon: TrendingUp, onClose: () => setEdit(null), width: 420 },
       h("form", { onSubmit: save, noValidate: true },
-        h(Field, { label: T.amount }, h("input", { style: inputStyle, inputMode: "numeric", autoFocus: true, value: fmtDigits(edit.digits), placeholder: "50.000.000", onChange: (e) => setEdit({ ...edit, digits: e.target.value.replace(/\D/g, "").slice(0, 13) }) })),
+        h(Field, { label: T.amount }, h("input", { style: inputStyle, inputMode: "numeric", autoFocus: true, value: fmtDigits(edit.digits), placeholder: edit.key.length === 4 ? "600.000.000" : "50.000.000", onChange: (e) => setEdit({ ...edit, digits: e.target.value.replace(/\D/g, "").slice(0, 13) }) })),
         h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
           h(Button, { variant: "secondary", icon: X, onClick: () => setEdit(null) }, T.cancel),
           h(Button, { type: "submit", icon: Check, disabled: busy }, T.save)))),
-    del && h(ConfirmModal, { message: T.del_msg(tgMonthLabel(del.month, lang, true)), onConfirm: () => remove(del.month), onCancel: () => setDel(null), t: ctx.t }));
+    del && h(ConfirmModal, { message: T.del_msg(del.label), onConfirm: () => remove(del.key), onCancel: () => setDel(null), t: ctx.t }));
 }
