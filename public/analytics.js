@@ -544,6 +544,7 @@ const AN_CSS = (B) => `
   @media (max-width: 1100px) { .an-row3 { grid-template-columns: 1fr 1fr; } .an-row3 > :first-child { grid-column: 1 / -1; } }
   @media (max-width: 980px) { .an-kpis { grid-template-columns: 1fr 1fr; } .an-row2 { grid-template-columns: 1fr; } }
   @media (max-width: 720px) { .an-row3 { grid-template-columns: 1fr; } .an-list > div { grid-template-columns: 40px minmax(0,1fr) auto; } .an-list .an-bar { display:none; } }
+  @media (max-width: 560px) { .tg-filters { width:100%; margin-left:0 !important; flex-wrap:nowrap !important; } .tg-filters .an-chip { flex:1; min-width:0; } .tg-filters .an-chip > .lbl { display:none; } .tg-filters .an-chip > .val { flex:1; min-width:0; padding:0 4px; } }
   @media (max-width: 560px) { .an-kpis { grid-template-columns: 1fr; } .an-rows > div { grid-template-columns: 22px 1fr auto 44px; } }
   @media (max-width: 880px) { .an-mobile-only { display:block; margin-top:26px; } }
 `;
@@ -1151,7 +1152,7 @@ function TargetWidget({ month, refresh, canManage, setTab, lang }) {
   yearOpts.sort((x, z) => x - z);
   const monthName = (m) => new Date(2000, m - 1, 1).toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", { month: "long" });
   const chip = (label, node) => h("div", { className: "an-chip" }, h("span", { className: "lbl" }, label), h("span", { className: "val" }, node));
-  const filters = h("div", { className: "an-filters", style: { marginLeft: "auto" } },
+  const filters = h("div", { className: "an-filters tg-filters", style: { marginLeft: "auto" } },
     chip(T.month, h(ShSelect, { value: sel.m, onChange: (m) => setSel({ ...sel, m: Number(m) }), icon: "calendar", label: T.month, options: Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: monthName(i + 1) })) })),
     chip(T.year_lbl, h(ShSelect, { value: sel.y, onChange: (y) => setSel({ ...sel, y: Number(y) }), icon: "calendar", label: T.year_lbl, options: yearOpts.map((y) => ({ value: y, label: String(y) })) })));
 

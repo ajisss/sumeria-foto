@@ -3208,6 +3208,7 @@ function IconBtn({
   return React.createElement(
     "button",
     {
+      className: "icon-btn",
       "aria-label": r,
       onMouseEnter: show,
       onFocus: show,
