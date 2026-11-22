@@ -158,6 +158,17 @@ const UI_CSS = `
   .cd-info { display:flex; flex-direction:column; gap:2px; padding:11px 14px; background:var(--c-surface); font-size:13.5px; min-width:0; }
   .cd-info span { font-size:12px; color:var(--c-inkSoft); }
   .cd-info b { font-weight:600; color:var(--c-ink); overflow-wrap:anywhere; }
+  .cd-info.cd-pic { grid-column:1 / -1; }
+  .cd-stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-top:16px; }
+  .cd-stat { --tc:#2F65E0; --tb:#EAF0FD; position:relative; display:grid; grid-template-columns:1fr auto; align-items:center; gap:10px 8px; padding:14px 16px 16px; border:1px solid var(--c-line); border-radius:14px; background:linear-gradient(180deg, var(--tb) 0%, var(--c-surface) 78%); transition:transform .15s ease, box-shadow .15s ease; }
+  .cd-stat:hover { transform:translateY(-1px); box-shadow:0 6px 18px rgba(16,24,40,.07); }
+  .cd-stat.green { --tc:#15803D; --tb:#E8F7EE; }
+  .cd-stat.amber { --tc:#B45309; --tb:#FEF3E2; }
+  .cd-stat.gray { --tc:#6B7280; --tb:#F3F4F6; }
+  .cd-stat-l { grid-column:1; grid-row:1; font-size:11.5px; font-weight:500; color:var(--c-inkSoft); letter-spacing:.01em; min-width:0; }
+  .cd-stat-ic { grid-column:2; grid-row:1; width:30px; height:30px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; background:var(--c-surface); color:var(--tc); box-shadow:0 1px 2px rgba(16,24,40,.08); }
+  .cd-stat-v { grid-column:1 / -1; grid-row:2; font-size:22px; line-height:1.1; font-weight:700; letter-spacing:-.02em; color:var(--tc); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .cd-stat.blue .cd-stat-v { color:var(--c-ink); }
   .ui-help { font-size:12px; color:var(--c-inkSoft); margin-top:6px; }
 
   /* Mobile: tabel halaman berubah jadi kartu (satu baris = satu kartu, label kolom di kiri). Tabel di dalam modal
