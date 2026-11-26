@@ -7726,17 +7726,29 @@ function downloadInvoicePdf(o) {
   return (a.save(r), r);
 }
 function buildInvoiceWaMessage(o) {
-  const a = (o.customerSnap && o.customerSnap.name) || "";
+  const name = (o.customerSnap && o.customerSnap.name) || "",
+    head = "#" + o.invNumber + "\nHalo Kak " + name + ", ";
+  if (isFullyPaid(o))
+    return (
+      head +
+      "Terima kasih ya, pembayarannya sudah kami terima. Terlampir kami kirimkan invoice sebagai dokumen atas pembayaran yang sudah dilakukan \u{1F60A}\n\nCheers,\nTim Sumeriapoto"
+    );
+  // Belum lunas: rincian item + total + sisa + termin berikutnya + rekening (setara pesan quotation).
+  const items = o.items || [],
+    list = items.map((l) => `* ${quotationItemLabel(l)}: ${fmtRp(lineTotal(l))}`).join("\n"),
+    total = docSubtotal(items),
+    paid = (o.payments || []).filter((p) => p.paid).reduce((x, p) => x + (Number(p.amount) || 0), 0),
+    idx = (o.payments || []).findIndex((p) => !p.paid),
+    next = idx >= 0 ? o.payments[idx] : null;
   return (
-    "#" +
-    o.invNumber +
-    `
-Halo Kak ` +
-    a +
-    `, Terima kasih ya, pembayarannya sudah kami terima. Terlampir kami kirimkan invoice sebagai dokumen atas pembayaran yang sudah dilakukan \u{1F60A}
-
-Cheers,
-Tim Sumeriapoto`
+    head +
+    "berikut invoice untuk pesanan Kakak. Terlampir dokumennya ya.\n\n*Details Item,*\n" +
+    list +
+    `\n\n*Total : ${fmtRp(total)}*` +
+    (paid > 0 ? `\nSudah dibayar: ${fmtRp(paid)}` : "") +
+    `\nSisa pembayaran: *${fmtRp(Math.max(0, total - paid))}*` +
+    (next ? `\n\nTahap berikutnya: *${next.label}* ${fmtRp(next.amount)}, jatuh tempo ${fmtDate(paymentDue(o, idx))}` : "") +
+    "\nPembayaran hanya dilakukan melalui rekening *BCA 8761141988* an. Mochamad Annas Afan\n\nThanks for choosing us! Looking forward to working with you \u{1F90D}"
   );
 }
 /* Kirim dokumen ke WhatsApp. SEMUA langkah sebelum share/open berjalan sinkron di dalam klik, karena browser
