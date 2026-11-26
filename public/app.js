@@ -7725,65 +7725,65 @@ function downloadInvoicePdf(o) {
     r = pdfFileName(o.invNumber, o);
   return (a.save(r), r);
 }
-function sendInvoiceWhatsApp(o) {
-  try {
-    downloadInvoicePdf(o);
-  } catch (n) {
-    (console.error("PDF generation failed", n),
-      alert(
-        "PDF belum bisa dibuat karena butuh koneksi internet aktif. WhatsApp tetap akan dibuka, tapi lampirkan invoice secara manual ya.",
-      ));
-  }
-  const a = (o.customerSnap && o.customerSnap.name) || "",
-    t = waPhone(o.customerSnap && o.customerSnap.phone),
-    r =
-      "#" +
-      o.invNumber +
-      `
+function buildInvoiceWaMessage(o) {
+  const a = (o.customerSnap && o.customerSnap.name) || "";
+  return (
+    "#" +
+    o.invNumber +
+    `
 Halo Kak ` +
-      a +
-      `, Terima kasih ya, pembayarannya sudah kami terima. Terlampir kami kirimkan invoice sebagai dokumen atas pembayaran yang sudah dilakukan \u{1F60A}
+    a +
+    `, Terima kasih ya, pembayarannya sudah kami terima. Terlampir kami kirimkan invoice sebagai dokumen atas pembayaran yang sudah dilakukan \u{1F60A}
 
 Cheers,
-Tim Sumeriapoto`;
-  window.open(
-    "https://wa.me/" + t + "?text=" + encodeURIComponent(r),
-    "_blank",
+Tim Sumeriapoto`
   );
+}
+/* Kirim dokumen ke WhatsApp. SEMUA langkah sebelum share/open berjalan sinkron di dalam klik, karena browser
+   (terutama Safari) memblokir window.open / navigator.share bila dipanggil setelah await (izin klik sudah hangus).
+   1) Web Share API + file PDF (Mac/HP): PDF terlampir langsung, nomor tujuan dipilih di WhatsApp.
+   2) Cadangan: unduh PDF + buka wa.me ke nomor customer dengan teks; PDF dilampirkan manual. */
+function sendDocWhatsApp(kind, o) {
+  const inv = kind === "invoice",
+    text = inv ? buildInvoiceWaMessage(o) : buildQuotationWaMessage(o),
+    phone = waPhone(o.customerSnap && o.customerSnap.phone),
+    name = pdfFileName(inv ? o.invNumber : o.quoNumber, o),
+    openWa = () => window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(text), "_blank");
+  let pdf = null,
+    file = null;
+  try {
+    pdf = inv ? buildInvoicePdf(o) : buildQuotationPdf(o);
+    file = new File([pdf.output("blob")], name, { type: "application/pdf" });
+  } catch (err) {
+    console.error("PDF generation failed", err);
+    alert("PDF belum bisa dibuat karena butuh koneksi internet aktif. WhatsApp tetap akan dibuka, tapi lampirkan dokumennya secara manual ya.");
+    openWa();
+    return;
+  }
+  const fallback = () => {
+    pdf.save(name);
+    openWa();
+  };
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], text }).catch((err) => {
+      if (err && err.name === "AbortError") return; /* user menutup menu Share */
+      console.error("share failed, fallback ke unduh + wa.me", err);
+      fallback();
+    });
+    return;
+  }
+  fallback();
+}
+function sendInvoiceWhatsApp(o) {
+  sendDocWhatsApp("invoice", o);
 }
 function downloadQuotationPdf(o) {
   const a = buildQuotationPdf(o),
     r = pdfFileName(o.quoNumber, o);
   return (a.save(r), r);
 }
-async function sendQuotationWhatsApp(o) {
-  const text = buildQuotationWaMessage(o),
-    phone = waPhone(o.customerSnap && o.customerSnap.phone);
-  /* Utama: Web Share API dengan file PDF. Browser tidak bisa melampirkan file lewat link wa.me, tapi
-     menu Share (Mac/HP) bisa mengirim PDF + teks sekaligus ke WhatsApp. Nomor tujuan dipilih di WhatsApp. */
-  try {
-    const pdf = buildQuotationPdf(o),
-      file = new File([pdf.output("blob")], pdfFileName(o.quoNumber, o), {
-        type: "application/pdf",
-      });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], text });
-      return;
-    }
-  } catch (err) {
-    if (err && err.name === "AbortError") return; /* user menutup menu Share */
-    console.error("share failed, fallback ke unduh + wa.me", err);
-  }
-  /* Cadangan: unduh PDF, buka WhatsApp dengan teks; PDF dilampirkan manual. */
-  try {
-    downloadQuotationPdf(o);
-  } catch (r) {
-    (console.error("PDF generation failed", r),
-      alert(
-        "PDF belum bisa dibuat karena butuh koneksi internet aktif. WhatsApp tetap akan dibuka, tapi lampirkan quotation secara manual ya.",
-      ));
-  }
-  window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(text), "_blank");
+function sendQuotationWhatsApp(o) {
+  sendDocWhatsApp("quotation", o);
 }
 const __root = ReactDOM.createRoot(document.getElementById("root"));
 __root.render(React.createElement(App, null));
