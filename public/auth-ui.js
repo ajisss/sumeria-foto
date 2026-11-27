@@ -364,12 +364,15 @@ function AuthGate({ onLogin, dark, toggleTheme, lang, changeLang }) {
 
 const ROLE_LABEL = { owner: "Owner", admin: "Admin", staff: "Staff", viewer: "Viewer" };
 const MANAGEABLE = { owner: ["owner", "admin", "staff", "viewer"] };
-const ROLE_HINT = {
-  admin: "Admin: hanya menu Sales (quotation, invoice, orders, kalender, package item) dan Customer. Tanpa keuangan dan tanpa kelola user.",
-  staff: "Staff: customer, quotation, invoice. Tanpa pengeluaran.",
-  viewer: "Viewer: hanya melihat customer, quotation, invoice.",
-  owner: "Owner: semua akses termasuk keuangan dan kelola akun.",
-};
+// Teks halaman Users mengikuti bahasa aplikasi (ID/EN): uT("indonesia", "english").
+const uT = (id, en) => (typeof window !== "undefined" && window.__uiLang === "en" ? en : id);
+const roleHint = (r) =>
+  ({
+    admin: uT("Admin: hanya menu Sales (quotation, invoice, orders, kalender, package item) dan Customer. Tanpa keuangan dan tanpa kelola user.", "Admin: Sales menus only (quotations, invoices, orders, calendar, package items) and Customers. No finance and no user management."),
+    staff: uT("Staff: customer, quotation, invoice. Tanpa pengeluaran.", "Staff: customers, quotations, invoices. No expenses."),
+    viewer: uT("Viewer: hanya melihat customer, quotation, invoice.", "Viewer: can only view customers, quotations, invoices."),
+    owner: uT("Owner: semua akses termasuk keuangan dan kelola akun.", "Owner: full access including finance and account management."),
+  })[r];
 
 /** Password acak 16 karakter tanpa karakter yang mudah tertukar (0/O, 1/l/I). */
 function genPassword() {
@@ -420,7 +423,7 @@ function UsersPage({ ctx }) {
       ctx.showToast(okMsg);
       await load();
     } catch (x) {
-      ctx.showToast(x.message || "Gagal", "error");
+      ctx.showToast(x.message || uT("Gagal", "Failed"), "error");
     }
   }
 
@@ -434,9 +437,9 @@ function UsersPage({ ctx }) {
     e.preventDefault();
     if (busy) return;
     setFormErr("");
-    if (!form.name.trim()) return setFormErr("Nama wajib diisi.");
-    if (!EMAIL_RE.test(form.email)) return setFormErr("Email tidak valid.");
-    if (form.password.length < 10) return setFormErr("Password minimal 10 karakter.");
+    if (!form.name.trim()) return setFormErr(uT("Nama wajib diisi.", "Name is required."));
+    if (!EMAIL_RE.test(form.email)) return setFormErr(uT("Email tidak valid.", "Invalid email."));
+    if (form.password.length < 10) return setFormErr(uT("Password minimal 10 karakter.", "Password must be at least 10 characters."));
     setBusy(true);
     try {
       await apiFetch("/api/users", { method: "POST", body: { name: form.name.trim(), email: form.email.trim(), role: form.role, password: form.password } });
@@ -452,20 +455,20 @@ function UsersPage({ ctx }) {
   async function submitReset(e) {
     e.preventDefault();
     if (busy || !reset) return;
-    if (resetPw.length < 10) return ctx.showToast("Password minimal 10 karakter.", "error");
+    if (resetPw.length < 10) return ctx.showToast(uT("Password minimal 10 karakter.", "Password must be at least 10 characters."), "error");
     setBusy(true);
     try {
       await apiFetch("/api/users/" + reset.id + "/reset-password", { method: "POST", body: { password: resetPw } });
       setCreds({ email: reset.email, password: resetPw });
       setReset(null);
     } catch (x) {
-      ctx.showToast(x.message || "Gagal", "error");
+      ctx.showToast(x.message || uT("Gagal", "Failed"), "error");
     }
     setBusy(false);
   }
 
   const copy = (text) => {
-    try { navigator.clipboard.writeText(text); ctx.showToast("Disalin"); } catch (_) { ctx.showToast("Gagal menyalin", "error"); }
+    try { navigator.clipboard.writeText(text); ctx.showToast(uT("Disalin", "Copied")); } catch (_) { ctx.showToast(uT("Gagal menyalin", "Copy failed"), "error"); }
   };
   const manageable = (u) => u.id !== me.id && roles.includes(u.role);
 
@@ -473,66 +476,66 @@ function UsersPage({ ctx }) {
     "div",
     null,
     h(PageHeader, {
-      title: "Pengguna",
-      subtitle: "Kelola akses tim. Akun dibuat oleh owner dengan credential (email + password).",
-      action: h(Button, { icon: Plus, onClick: openCreate }, "Buat akun"),
+      title: uT("Pengguna", "Users"),
+      subtitle: uT("Kelola akses tim. Akun dibuat oleh owner dengan credential (email + password).", "Manage team access. Accounts are created by the owner with credentials (email + password)."),
+      action: h(Button, { icon: Plus, onClick: openCreate }, uT("Buat akun", "Create account")),
     }),
     loadErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 13 } }, loadErr),
-    !users && !loadErr && h("p", { style: { color: BRAND.inkSoft } }, "Memuat…"),
+    !users && !loadErr && h("p", { style: { color: BRAND.inkSoft } }, uT("Memuat…", "Loading…")),
     users &&
       h(Card, { style: { padding: 0, overflowX: "auto" } }, h(Table, null,
-          h(TableHeader, null, h(TableRow, null, ["Nama", "Email", "Role", "Status", ""].map((c, i) => h(TableHead, { key: i }, c)))),
+          h(TableHeader, null, h(TableRow, null, [uT("Nama", "Name"), "Email", "Role", "Status", ""].map((c, i) => h(TableHead, { key: i }, c)))),
           h(TableBody, null, users.map((u) =>
             h(TableRow, { key: u.id },
-              h(TableCell, { style: { fontWeight: 600 } }, u.name, u.id === me.id && h("span", { style: { color: BRAND.inkSoft } }, " (kamu)")),
+              h(TableCell, { style: { fontWeight: 600 } }, u.name, u.id === me.id && h("span", { style: { color: BRAND.inkSoft } }, uT(" (kamu)", " (you)"))),
               h(TableCell, null, u.email),
               h(TableCell, null,
                 manageable(u)
                   ? h(UiSelect, {
                       value: u.role,
                       "aria-label": "Role " + u.email,
-                      onChange: (e) => setConfirm({ title: "Ubah role", message: `Ubah role ${u.email} menjadi ${ROLE_LABEL[e.target.value]}? Sesi login user ini akan diakhiri.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { role: e.target.value } }), "Role diperbarui") }),
+                      onChange: (e) => setConfirm({ title: uT("Ubah role", "Change role"), message: uT(`Ubah role ${u.email} menjadi ${ROLE_LABEL[e.target.value]}? Sesi login user ini akan diakhiri.`, `Change the role of ${u.email} to ${ROLE_LABEL[e.target.value]}? This user will be signed out.`), run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { role: e.target.value } }), uT("Role diperbarui", "Role updated")) }),
                       style: { ...inputStyle, width: "auto", padding: "5px 8px" },
                     }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))
                   : h(Badge, { tone: "gray" }, ROLE_LABEL[u.role] || u.role)),
-              h(TableCell, null, h(Badge, { tone: u.banned ? "red" : "green" }, u.banned ? "Nonaktif" : "Aktif")),
+              h(TableCell, null, h(Badge, { tone: u.banned ? "red" : "green" }, u.banned ? uT("Nonaktif", "Inactive") : uT("Aktif", "Active"))),
               h(TableCell, { style: { textAlign: "right", whiteSpace: "nowrap" } },
                 h("div", { style: { display: "flex", gap: 6, justifyContent: "flex-end" } },
                   manageable(u) && !u.banned && h(IconBtn, { icon: KeyRound, title: "Reset password", onClick: () => { setResetPw(genPassword()); setReset(u); } }),
-                  manageable(u) && h(IconBtn, { icon: u.banned ? Check : Lock, tone: u.banned ? "default" : "danger", title: u.banned ? "Aktifkan" : "Nonaktifkan", onClick: () => setConfirm({ title: u.banned ? "Aktifkan akun" : "Nonaktifkan akun", message: u.banned ? `Aktifkan kembali ${u.email}?` : `Nonaktifkan ${u.email}? User ini langsung keluar dan tidak bisa masuk.`, run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { banned: !u.banned } }), u.banned ? "Akun diaktifkan" : "Akun dinonaktifkan") }) })))))))),
+                  manageable(u) && h(IconBtn, { icon: u.banned ? Check : Lock, tone: u.banned ? "default" : "danger", title: u.banned ? uT("Aktifkan", "Activate") : uT("Nonaktifkan", "Deactivate"), onClick: () => setConfirm({ title: u.banned ? uT("Aktifkan akun", "Activate account") : uT("Nonaktifkan akun", "Deactivate account"), message: u.banned ? uT(`Aktifkan kembali ${u.email}?`, `Reactivate ${u.email}?`) : uT(`Nonaktifkan ${u.email}? User ini langsung keluar dan tidak bisa masuk.`, `Deactivate ${u.email}? This user is signed out immediately and cannot sign in.`), run: () => act(() => apiFetch("/api/users/" + u.id, { method: "PATCH", body: { banned: !u.banned } }), u.banned ? uT("Akun diaktifkan", "Account activated") : uT("Akun dinonaktifkan", "Account deactivated")) }) })))))))),
     create &&
-      h(Modal, { title: "Buat akun", subtitle: "Isi credential untuk anggota tim. Password ditampilkan sekali setelah akun dibuat.", icon: Users, onClose: () => setCreate(false), width: 460 },
+      h(Modal, { title: uT("Buat akun", "Create account"), subtitle: uT("Isi credential untuk anggota tim. Password ditampilkan sekali setelah akun dibuat.", "Enter credentials for the team member. The password is shown once after the account is created."), icon: Users, onClose: () => setCreate(false), width: 460 },
         h("form", { onSubmit: submitCreate, noValidate: true },
-          h(Field, { label: "Nama" }, h("input", { style: inputStyle, value: form.name, maxLength: 100, onChange: (e) => setForm({ ...form, name: e.target.value }), autoFocus: true })),
+          h(Field, { label: uT("Nama", "Name") }, h("input", { style: inputStyle, value: form.name, maxLength: 100, onChange: (e) => setForm({ ...form, name: e.target.value }), autoFocus: true })),
           h(Field, { label: "Email" }, h("input", { style: inputStyle, type: "email", autoComplete: "off", value: form.email, onChange: (e) => setForm({ ...form, email: e.target.value }) })),
           h(Field, { label: "Role" }, h(UiSelect, { style: inputStyle, value: form.role, onChange: (e) => setForm({ ...form, role: e.target.value }) }, roles.map((r) => h("option", { key: r, value: r }, ROLE_LABEL[r])))),
           h(PwField, { label: "Password", value: form.password, autoComplete: "new-password", onChange: (e) => setForm({ ...form, password: e.target.value }) }),
-          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setForm({ ...form, password: genPassword() }), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, "Buat password acak")),
-          h("p", { style: { fontSize: 12, color: BRAND.inkSoft, lineHeight: 1.5 } }, ROLE_HINT[form.role]),
+          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setForm({ ...form, password: genPassword() }), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, uT("Buat password acak", "Generate random password"))),
+          h("p", { style: { fontSize: 12, color: BRAND.inkSoft, lineHeight: 1.5 } }, roleHint(form.role)),
           formErr && h("p", { role: "alert", style: { color: BRAND.red, fontSize: 12.5 } }, formErr),
           h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
-            h(Button, { variant: "secondary", icon: X, onClick: () => setCreate(false) }, "Batal"),
-            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Membuat…" : "Buat akun")))),
+            h(Button, { variant: "secondary", icon: X, onClick: () => setCreate(false) }, uT("Batal", "Cancel")),
+            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? uT("Membuat…", "Creating…") : uT("Buat akun", "Create account"))))),
     reset &&
-      h(Modal, { title: "Reset password", subtitle: reset.email + ". Sesi login user ini akan diakhiri.", icon: KeyRound, onClose: () => setReset(null), width: 440 },
+      h(Modal, { title: "Reset password", subtitle: reset.email + uT(". Sesi login user ini akan diakhiri.", ". This user will be signed out."), icon: KeyRound, onClose: () => setReset(null), width: 440 },
         h("form", { onSubmit: submitReset, noValidate: true },
-          h(PwField, { label: "Password baru", value: resetPw, autoComplete: "new-password", onChange: (e) => setResetPw(e.target.value) }),
-          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setResetPw(genPassword()), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, "Buat password acak")),
+          h(PwField, { label: uT("Password baru", "New password"), value: resetPw, autoComplete: "new-password", onChange: (e) => setResetPw(e.target.value) }),
+          h("div", { style: { marginTop: -6, marginBottom: 10 } }, h("button", { type: "button", onClick: () => setResetPw(genPassword()), style: { background: "none", border: "none", padding: 0, color: BRAND.blue, cursor: "pointer", fontSize: 12.5, textDecoration: "underline" } }, uT("Buat password acak", "Generate random password"))),
           h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 } },
-            h(Button, { variant: "secondary", icon: X, onClick: () => setReset(null) }, "Batal"),
-            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? "Menyimpan…" : "Reset password")))),
+            h(Button, { variant: "secondary", icon: X, onClick: () => setReset(null) }, uT("Batal", "Cancel")),
+            h(Button, { type: "submit", icon: Check, disabled: busy }, busy ? uT("Menyimpan…", "Saving…") : "Reset password")))),
     creds &&
-      h(Modal, { title: "Credential akun", subtitle: "Simpan sekarang. Password tidak akan ditampilkan lagi.", icon: Lock, onClose: () => setCreds(null), width: 440 },
+      h(Modal, { title: uT("Credential akun", "Account credentials"), subtitle: uT("Simpan sekarang. Password tidak akan ditampilkan lagi.", "Save it now. The password will not be shown again."), icon: Lock, onClose: () => setCreds(null), width: 440 },
         h(CredentialCard, { email: creds.email, password: creds.password }),
         h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 } },
-          h(Button, { variant: "secondary", icon: Check, onClick: () => setCreds(null) }, "Selesai"),
-          h(Button, { icon: Save, onClick: () => copy("Email: " + creds.email + "\nPassword: " + creds.password) }, "Salin credential"))),
+          h(Button, { variant: "secondary", icon: Check, onClick: () => setCreds(null) }, uT("Selesai", "Done")),
+          h(Button, { icon: Save, onClick: () => copy("Email: " + creds.email + "\nPassword: " + creds.password) }, uT("Salin credential", "Copy credentials")))),
     confirm &&
       h(Modal, { title: confirm.title, onClose: () => setConfirm(null), width: 420 },
         h("p", { style: { fontSize: 13.5, lineHeight: 1.5, color: BRAND.ink } }, confirm.message),
         h("div", { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 } },
-          h(Button, { variant: "secondary", icon: X, onClick: () => { setConfirm(null); load(); } }, "Batal"),
-          h(Button, { icon: Check, onClick: () => { const run = confirm.run; setConfirm(null); run(); } }, "Lanjut"))),
+          h(Button, { variant: "secondary", icon: X, onClick: () => { setConfirm(null); load(); } }, uT("Batal", "Cancel")),
+          h(Button, { icon: Check, onClick: () => { const run = confirm.run; setConfirm(null); run(); } }, uT("Lanjut", "Continue")))),
   );
 }
 
@@ -729,7 +732,7 @@ function AccountPanel({ me, showToast }) {
   return h("div", null,
     section("Informasi profil", "Nama yang tampil di aplikasi dan riwayat aktivitas.",
       h("form", { onSubmit: saveName },
-        h(Field, { label: "Nama" }, h("input", { style: inputStyle, value: name, maxLength: 100, onChange: (e) => setName(e.target.value), autoComplete: "name" })),
+        h(Field, { label: uT("Nama", "Name") }, h("input", { style: inputStyle, value: name, maxLength: 100, onChange: (e) => setName(e.target.value), autoComplete: "name" })),
         h("div", { style: { display: "flex", justifyContent: "flex-end" } },
           h(Button, { type: "submit", icon: Save, disabled: busy === "name" || !name.trim() || name.trim() === me.user.name }, busy === "name" ? "Menyimpan…" : "Simpan nama")))),
     h("div", { style: { height: 24 } }),

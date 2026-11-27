@@ -189,6 +189,11 @@ const HD_CSS = (B) => `
     .hd-name { display:none; }
     .hd-pop { position:fixed; top:60px; right:10px; left:10px; min-width:0; }
   }
+  @media (max-width: 480px) {
+    .hd { padding:8px 10px; }
+    .hd-actions { gap:4px; }
+    .hd-hello h1 { font-size:14px !important; }
+  }
 `;
 
 /* Judul halaman dikirim oleh PageHeader (app.js) lewat bus kecil ini. */

@@ -41,6 +41,7 @@ const UI_CSS = `
   .ui-table .ui-td { padding:13px 14px; vertical-align:middle; font-size:13.5px; color:var(--c-ink); border-bottom:1px solid var(--c-line); }
   .ui-table .ui-tbody .ui-tr:last-child .ui-td { border-bottom:none; }
   .ui-table [data-num] { text-align:right; font-variant-numeric:tabular-nums; }
+  .ui-table td[data-num] { white-space:nowrap; }
   .ui-table input[type=number] { -moz-appearance:textfield; appearance:textfield; }
   .ui-table input[type=number]::-webkit-inner-spin-button, .ui-table input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
   .ui-table tr[data-pg-hide] { display:none; }
@@ -179,10 +180,16 @@ const UI_CSS = `
   .cd-stat-ic { grid-column:2; grid-row:1; width:30px; height:30px; border-radius:10px; display:inline-flex; align-items:center; justify-content:center; background:var(--c-surface); color:var(--tc); box-shadow:0 1px 2px rgba(16,24,40,.08); }
   .cd-stat-v { grid-column:1 / -1; grid-row:2; font-size:22px; line-height:1.1; font-weight:700; letter-spacing:-.02em; color:var(--tc); white-space:nowrap; font-variant-numeric:tabular-nums; }
   .cd-stat.blue .cd-stat-v { color:var(--c-ink); }
+  /* Mode gelap: tint kartu statistik jangan pastel terang (label jadi tak terbaca). */
+  [data-theme="dark"] .cd-stat { --tc:#8FB0FF; --tb:rgba(79,124,255,.16); }
+  [data-theme="dark"] .cd-stat.green { --tc:#4ADE80; --tb:rgba(34,197,94,.15); }
+  [data-theme="dark"] .cd-stat.amber { --tc:#FBBF24; --tb:rgba(245,158,11,.15); }
+  [data-theme="dark"] .cd-stat.gray { --tc:#A1A1AA; --tb:rgba(161,161,170,.12); }
   .ui-help { font-size:12px; color:var(--c-inkSoft); margin-top:6px; }
 
   /* Mobile: tabel halaman berubah jadi kartu (satu baris = satu kartu, label kolom di kiri). Tabel di dalam modal
      (editor item) tetap tabel biasa yang bisa digeser. Label diisi dari header kolom oleh Table (data-label). */
+  @media (max-width: 480px) { .cd-stats { grid-template-columns:1fr; } }
   @media (max-width: 720px) {
     .ui-tscroll { max-height:none !important; overflow:visible; }
     .ui-table[data-cards] { display:block; }
@@ -201,6 +208,43 @@ const UI_CSS = `
     .ui-table[data-cards] td.ui-td[colspan]::before { display:none; }
     .ui-pager { justify-content:center; }
     .icon-btn { width:40px !important; height:40px !important; min-width:40px !important; }
+    /* Checkbox pilih-banyak: tidak memakan satu baris penuh, menempel di pojok kanan atas kartu. */
+    .ui-table[data-cards] .ui-tr { position:relative; }
+    .ui-table[data-cards] td.ui-td.sel-td { position:absolute; top:8px; right:10px; width:auto; min-height:0; padding:0; border:none; z-index:1; }
+    .ui-table[data-cards] .ui-tbody .ui-tr:has(.sel-td) td.ui-td:nth-child(2) { padding-right:34px; }
+    /* Baris aksi halaman (cari + tombol): penuh selebar layar, bukan rata kanan. */
+    /* Editor item (quotation/invoice): di HP baris tabel 1000px diganti kartu bertumpuk supaya tidak perlu geser samping. */
+    .ui-scroll:has(.ie-table) { max-height:none !important; overflow:visible !important; border:none !important; }
+    .ie-table { display:block; min-width:0 !important; width:100% !important; }
+    .ie-table .ui-thead { display:none; }
+    .ie-table .ui-tbody { display:flex; flex-direction:column; gap:10px; }
+    .ie-table tr.ui-tr { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; border:1px solid var(--c-line); border-radius:12px; background:var(--c-surface); }
+    .ie-table td.ui-td { display:block; min-width:0; width:auto !important; padding:0 !important; border:none !important; text-align:left; font-size:13.5px !important; }
+    .ie-table td.ui-td::before { content:attr(data-label); display:block; margin-bottom:4px; font-size:11.5px; font-weight:500; color:var(--c-inkSoft); }
+    .ie-table td.ui-td[data-label=""]::before { display:none; }
+    .ie-table td.ui-td:nth-child(1) { grid-column:1 / -1; display:flex; align-items:center; gap:6px; font-weight:600; }
+    .ie-table td.ui-td:nth-child(1)::before { margin:0; }
+    .ie-table td.ui-td:nth-child(3), .ie-table td.ui-td:nth-child(4) { grid-column:1 / -1; }
+    .ie-table td.ui-td:nth-child(9) { position:absolute; top:6px; right:6px; }
+    .ie-table td.ui-td[colspan] { grid-column:1 / -1; text-align:center; padding:12px 0 !important; }
+    .ie-table td.ui-td[colspan]::before { display:none; }
+    /* Editor baris pengeluaran: sama, kartu bertumpuk di HP. */
+    .xp-wrap { overflow:visible !important; border:none !important; }
+    .xp-table { display:block; min-width:0 !important; width:100% !important; }
+    .xp-table .ui-thead { display:none; }
+    .xp-table .ui-tbody { display:flex; flex-direction:column; gap:10px; }
+    .xp-table tr.ui-tr { position:relative; display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:12px; border:1px solid var(--c-line); border-radius:12px; background:var(--c-surface); }
+    .xp-table td.ui-td { display:block; min-width:0; width:auto !important; padding:0 !important; border:none !important; text-align:left; font-size:13.5px !important; }
+    .xp-table td.ui-td::before { content:attr(data-label); display:block; margin-bottom:4px; font-size:11.5px; font-weight:500; color:var(--c-inkSoft); }
+    .xp-table td.ui-td[data-label=""]::before { display:none; }
+    .xp-table td.ui-td:nth-child(1) { grid-column:1 / -1; display:flex; align-items:center; gap:6px; font-weight:600; }
+    .xp-table td.ui-td:nth-child(1)::before { margin:0; }
+    .xp-table td.ui-td:nth-child(2) { grid-column:1 / -1; }
+    .xp-table td.ui-td:last-child { position:absolute; top:6px; right:6px; }
+    /* Detail customer: tinggi panel tidak dikunci di HP (hindari scroll bertingkat di dalam modal). */
+    .cd-pane { height:auto; min-height:0; overflow:visible; }
+    .ph-bar > div { flex:1 1 100% !important; min-width:0 !important; }
+    .ph-bar > button { flex:1 1 auto; justify-content:center; }
   }
 `;
 
