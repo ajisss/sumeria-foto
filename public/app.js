@@ -4358,6 +4358,11 @@ function CustomerModal({ customer: o, customers: all, onSave: a, onClose: t, t: 
 // Deskripsi item dokumen = poin-poin dipisah baris baru (poin boleh berisi koma). Data lama dipisah koma tetap terbaca.
 function splitDescLines(o) {
   const s = String(o || "");
+  // Satu poin package yang mengandung koma ("Album 20x30 cm, 30 halaman") jangan dipecah per koma.
+  if (!s.includes("\n")) {
+    const t = s.trim();
+    if (t.includes(",") && Object.values(PACKAGE_DESCS).some((l) => l.includes(t))) return [t];
+  }
   return (s.includes("\n") ? s.split("\n") : s.split(","))
     .map((a) => a.trim())
     .filter(Boolean);
@@ -4378,7 +4383,9 @@ function parseDescValue(o, opts = DESC_ITEMS_LIST) {
 }
 function buildDescValue(o, a) {
   const t = [...o];
-  return (a && a.trim() && t.push(a.trim()), t.join("\n"));
+  a && a.trim() && t.push(a.trim());
+  // Satu baris yang berkoma diberi newline penutup supaya tidak dibaca sebagai daftar berkoma (format lama).
+  return t.length === 1 && t[0].includes(",") ? t[0] + "\n" : t.join("\n");
 }
 // Pilihan deskripsi untuk satu item: poin dari package-nya; kalau package belum punya deskripsi, daftar umum lama.
 function descOptionsFor(packageItem) {
