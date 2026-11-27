@@ -7965,10 +7965,11 @@ function PrintView({ target: o, onClose: a }) {
                             style: {
                               fontSize: 10.5,
                               fontWeight: 700,
-                              color: d.paid ? BRAND.green : BRAND.amber,
+                              color: BRAND.ink,
+                              letterSpacing: "0.06em",
                             },
                           },
-                          d.paid ? "LUNAS" : "PENDING",
+                          d.paid ? "PAID" : "PENDING",
                         ),
                       ),
                     ),

@@ -337,14 +337,8 @@ function pdfBuild(o, kind) {
       pdfTxt(t, Number(p.percent).toFixed(0) + "%", pc[1].x, base, { size: 9, color: PDF_C.text, align: "right" });
       pdfTxt(t, fmtRp(p.amount), pc[2].x, base, { size: 9, color: PDF_C.ink, align: "right" });
       pdfTxt(t, pdfDate(paymentDue(o, i)), pc[3].x, base, { size: 8.6, color: PDF_C.soft });
-      if (p.paid) {
-        const pw = 40;
-        t.setFillColor(PDF_C.paidBg[0], PDF_C.paidBg[1], PDF_C.paidBg[2]);
-        t.roundedRect(R - 10 - pw, base - 10.5, pw, 15, 7.5, 7.5, "F");
-        pdfTxt(t, "PAID", R - 10 - pw / 2, base, { size: 7.4, style: "bold", color: PDF_C.paidFg, align: "center", cs: 0.8 });
-      } else {
-        pdfTxt(t, "PENDING", R - 10, base, { size: 7.4, style: "bold", color: PDF_C.faint, align: "right", cs: 0.8 });
-      }
+      // Status pembayaran: teks hitam saja (tanpa warna/pil) supaya sederhana.
+      pdfTxt(t, p.paid ? "PAID" : "PENDING", R - 10, base, { size: 7.4, style: "bold", color: PDF_C.ink, align: "right", cs: 0.8 });
       y += 24;
       pdfRule(t, PDF_M, R, y, PDF_C.rule, 0.5);
     });
