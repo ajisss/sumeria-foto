@@ -1031,6 +1031,20 @@ const Search = makeIcon(
       item_desc_custom_placeholder: "Tulis deskripsi lainnya",
       item_pkg_custom_placeholder: "Tulis package item",
       item_done: "Selesai",
+      bulk_selected: "{n} dipilih",
+      bulk_select_all: "Pilih semua ({n})",
+      bulk_clear: "Batal",
+      bulk_delete: "Hapus",
+      bulk_check_all: "Pilih semua baris",
+      bulk_check_row: "Pilih baris ini",
+      bulk_confirm: "{what}{extra} akan dihapus permanen.",
+      bulk_done: "{n} data dihapus",
+      bulk_what_customers: "{n} customer",
+      bulk_what_quotations: "{n} quotation",
+      bulk_what_invoices: "{n} invoice",
+      bulk_what_expenses: "{n} pengeluaran",
+      bulk_what_packages: "{n} package item",
+      bulk_extra_invoices: " beserta data pembayaran dan pengeluaran Project terkait",
       print_menu_export: "Export PDF",
       print_menu_whatsapp: "Kirim via WhatsApp",
       print_menu_cancel: "Batal",
@@ -1419,6 +1433,20 @@ const Search = makeIcon(
       item_desc_custom_placeholder: "Write other description",
       item_pkg_custom_placeholder: "Write package item",
       item_done: "Done",
+      bulk_selected: "{n} selected",
+      bulk_select_all: "Select all ({n})",
+      bulk_clear: "Clear",
+      bulk_delete: "Delete",
+      bulk_check_all: "Select all rows",
+      bulk_check_row: "Select this row",
+      bulk_confirm: "{what}{extra} will be permanently deleted.",
+      bulk_done: "{n} items deleted",
+      bulk_what_customers: "{n} customers",
+      bulk_what_quotations: "{n} quotations",
+      bulk_what_invoices: "{n} invoices",
+      bulk_what_expenses: "{n} expenses",
+      bulk_what_packages: "{n} package items",
+      bulk_extra_invoices: ", their payment data and linked Project expenses",
       print_menu_export: "Export PDF",
       print_menu_whatsapp: "Send via WhatsApp",
       print_menu_cancel: "Cancel",
@@ -3315,6 +3343,125 @@ function sortRows(o, a) {
     t
   );
 }
+/* ---------- Pilih banyak data (checkbox) + hapus massal ---------- */
+function useSelection(rows, enabled = !0) {
+  const [ids, setIds] = useState(() => new Set());
+  const last = useRef(null);
+  const order = rows.map((r) => r.id);
+  const picked = enabled ? order.filter((id) => ids.has(id)) : [];
+  const pickedSet = new Set(picked);
+  const all = order.length > 0 && picked.length === order.length;
+  return {
+    enabled,
+    count: picked.length,
+    total: order.length,
+    picked,
+    all,
+    some: picked.length > 0 && !all,
+    has: (id) => pickedSet.has(id),
+    // shift+klik = pilih rentang dari baris yang terakhir diklik
+    toggle(id, range) {
+      setIds((s) => {
+        const n = new Set(s),
+          on = !n.has(id),
+          from = range && last.current != null ? order.indexOf(last.current) : -1,
+          to = order.indexOf(id);
+        if (from >= 0 && to >= 0) order.slice(Math.min(from, to), Math.max(from, to) + 1).forEach((x) => (on ? n.add(x) : n.delete(x)));
+        else on ? n.add(id) : n.delete(id);
+        return n;
+      });
+      last.current = id;
+    },
+    toggleAll() {
+      setIds(all ? new Set() : new Set(order));
+      last.current = null;
+    },
+    selectAll() {
+      setIds(new Set(order));
+    },
+    clear() {
+      setIds(new Set());
+      last.current = null;
+    },
+  };
+}
+function SelBox({ checked: c, indeterminate: ind, disabled: dis, onToggle: tg, label: lb }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = !!ind && !c;
+  }, [ind, c]);
+  return React.createElement("input", {
+    ref,
+    type: "checkbox",
+    className: "ui-cb",
+    checked: !!c,
+    disabled: !!dis,
+    "aria-label": lb,
+    style: dis ? { visibility: "hidden" } : void 0,
+    onChange: () => {},
+    onClick: (e) => {
+      e.stopPropagation();
+      tg(e.shiftKey);
+    },
+  });
+}
+function SelHead({ sel, t }) {
+  return sel.enabled
+    ? React.createElement(TableHead, { className: "sel-th", style: { width: 44 } }, React.createElement(SelBox, { checked: sel.all, indeterminate: sel.some, onToggle: () => sel.toggleAll(), label: t("bulk_check_all") }))
+    : null;
+}
+// disabled = baris yang tidak boleh dihapus (kotak disembunyikan, tapi tetap ada supaya paginasi tabel tidak berubah)
+function SelCell({ sel, id, t, disabled }) {
+  return sel.enabled
+    ? React.createElement(TableCell, { className: "sel-td" }, React.createElement(SelBox, { checked: sel.has(id), disabled, onToggle: (range) => sel.toggle(id, range), label: t("bulk_check_row") }))
+    : null;
+}
+function BulkActions({ sel, t, kind, extra, onDelete, toast }) {
+  const h = React.createElement,
+    [ask, setAsk] = useState(!1),
+    fill = (k, n, w, x) => t(k).replace("{n}", n).replace("{what}", w || "").replace("{extra}", x || "");
+  useEffect(() => {
+    if (!sel.count) setAsk(!1);
+  }, [sel.count]);
+  useEffect(() => {
+    if (!sel.count || ask) return;
+    const k = (ev) => ev.key === "Escape" && !ev.defaultPrevented && !document.querySelector(".modal-overlay") && sel.clear();
+    document.addEventListener("keydown", k);
+    return () => document.removeEventListener("keydown", k);
+  }, [sel.count, ask]);
+  if (!sel.enabled || !sel.count) return null;
+  const ghost = { border: "none", background: "transparent", color: "inherit", opacity: 0.85, font: "inherit", fontSize: 13, cursor: "pointer", padding: "6px 8px", borderRadius: 8 };
+  return h(
+    React.Fragment,
+    null,
+    h(
+      "div",
+      { role: "toolbar", "aria-label": fill("bulk_selected", sel.count), style: { position: "fixed", left: "50%", bottom: 24, transform: "translateX(-50%)", zIndex: 60, display: "flex", alignItems: "center", gap: 6, padding: "9px 10px 9px 16px", borderRadius: 14, background: "var(--c-blue)", color: "var(--c-onBlue)", boxShadow: "0 18px 40px -14px rgba(9,9,11,.45)", maxWidth: "calc(100vw - 24px)", flexWrap: "wrap", justifyContent: "center" } },
+      h("b", { style: { fontSize: 13.5, fontWeight: 600, marginRight: 6, whiteSpace: "nowrap" } }, fill("bulk_selected", sel.count)),
+      !sel.all && h("button", { type: "button", style: ghost, onClick: () => sel.selectAll() }, fill("bulk_select_all", sel.total)),
+      h("button", { type: "button", style: ghost, onClick: () => sel.clear() }, t("bulk_clear")),
+      h(
+        "button",
+        { type: "button", onClick: () => setAsk(!0), style: { display: "inline-flex", alignItems: "center", gap: 6, border: "none", background: "var(--c-red)", color: "#fff", font: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: "8px 12px", borderRadius: 10 } },
+        h(Trash2, { size: 14 }),
+        t("bulk_delete"),
+      ),
+    ),
+    ask &&
+      h(ConfirmModal, {
+        message: fill("bulk_confirm", sel.count, fill("bulk_what_" + kind, sel.count), extra ? t("bulk_extra_" + kind) : ""),
+        onConfirm: () => {
+          const ids = sel.picked;
+          onDelete(ids);
+          sel.clear();
+          setAsk(!1);
+          toast && toast(fill("bulk_done", ids.length));
+        },
+        onCancel: () => setAsk(!1),
+        t,
+      }),
+  );
+}
 function DlgIcon({ icon: o, tone: a = "brand" }) {
   const t = a === "danger" ? { c: "#D92D20", r1: "rgba(217,45,32,.14)", r2: "rgba(217,45,32,.07)" } : { c: "var(--c-blue)", r1: "var(--c-grayBg)", r2: "var(--c-blueFaint)" };
   return React.createElement(
@@ -3805,9 +3952,11 @@ function CustomersPage({ ctx: o }) {
       c(null),
       h && h("Customer deleted"));
   }
+  const sel = useSelection(C, o.can ? o.can("write:customers") : !0);
   return React.createElement(
     "div",
     null,
+    React.createElement(BulkActions, { sel, t: e, kind: "customers", extra: !1, toast: h, onDelete: (ids) => t((z) => { const g = new Set(ids); return z.filter((x) => !g.has(x.id)); }) }),
     React.createElement(PageHeader, {
       title: e("cust_title"),
       subtitle: e("cust_subtitle"),
@@ -3849,6 +3998,7 @@ function CustomersPage({ ctx: o }) {
               React.createElement(
                 TableRow,
                 null,
+                React.createElement(SelHead, { sel, t: e }),
                 React.createElement(TableHead, { style: { width: 56 } }, e("item_no")),
                 React.createElement(Th, {
                   label: e("cust_col_name"),
@@ -3895,7 +4045,8 @@ function CustomersPage({ ctx: o }) {
               C.map((I, idx) =>
                 React.createElement(
                   TableRow,
-                  { key: I.id },
+                  { key: I.id, "data-sel": sel.has(I.id) ? "" : void 0 },
+                  React.createElement(SelCell, { sel, id: I.id, t: e }),
                   React.createElement(TableCell, { style: { color: BRAND.inkSoft } }, idx + 1),
                   React.createElement(TableCell, { style: { fontWeight: 600 } }, I.name),
                   React.createElement(TableCell, null, I.gender),
@@ -4590,9 +4741,11 @@ function QuotationsPage({ ctx: o }) {
       };
     (e((T) => [...T, E]), l("invoices"), hh && hh("Converted to invoice ✓"));
   }
+  const sel = useSelection(w, o.can ? o.can("write:quotations") : !0);
   return React.createElement(
     "div",
     null,
+    React.createElement(BulkActions, { sel, t: d, kind: "quotations", extra: !1, toast: hh, onDelete: (ids) => t((z) => { const g = new Set(ids); return z.filter((x) => !g.has(x.id)); }) }),
     React.createElement(PageHeader, {
       title: d("quo_title"),
       subtitle: d("quo_subtitle"),
@@ -4621,6 +4774,7 @@ function QuotationsPage({ ctx: o }) {
               React.createElement(
                 TableRow,
                 null,
+                React.createElement(SelHead, { sel, t: d }),
                 React.createElement(Th, {
                   label: d("quo_number"),
                   sortKey: "quoNumber",
@@ -4650,7 +4804,8 @@ function QuotationsPage({ ctx: o }) {
               w.map((i) =>
                 React.createElement(
                   TableRow,
-                  { key: i.id },
+                  { key: i.id, "data-sel": sel.has(i.id) ? "" : void 0 },
+                  React.createElement(SelCell, { sel, id: i.id, t: d }),
                   React.createElement(
                     TableCell,
                     { style: { fontWeight: 600 } },
@@ -4924,9 +5079,11 @@ function InvoicesPage({ ctx: o }) {
   }
   const g = (i) =>
     i === "Paid Full" ? "green" : i === "Belum Bayar" ? "gray" : "amber";
+  const sel = useSelection(w, o.can ? o.can("write:invoices") : !0);
   return React.createElement(
     "div",
     null,
+    React.createElement(BulkActions, { sel, t: d, kind: "invoices", extra: !0, toast: hh, onDelete: (ids) => t((z) => { const g = new Set(ids); return z.filter((x) => !g.has(x.id)); }) }),
     React.createElement(PageHeader, {
       title: d("inv_title"),
       subtitle: d("inv_subtitle"),
@@ -4955,6 +5112,7 @@ function InvoicesPage({ ctx: o }) {
               React.createElement(
                 TableRow,
                 null,
+                React.createElement(SelHead, { sel, t: d }),
                 React.createElement(Th, {
                   label: d("inv_number"),
                   sortKey: "invNumber",
@@ -4990,7 +5148,8 @@ function InvoicesPage({ ctx: o }) {
               w.map((i) =>
                 React.createElement(
                   TableRow,
-                  { key: i.id },
+                  { key: i.id, "data-sel": sel.has(i.id) ? "" : void 0 },
+                  React.createElement(SelCell, { sel, id: i.id, t: d }),
                   React.createElement(
                     TableCell,
                     { style: { fontWeight: 600 } },
@@ -6087,9 +6246,11 @@ function ExpensesPage({ ctx: o }) {
   const orphanIds = new Set(r.map((x) => x.id)),
     orphans = a.filter((x) => x.category === "Project" && x.invoiceId && !orphanIds.has(x.invoiceId)),
     idLang = o.lang !== "en";
+  const sel = useSelection(S, o.can ? o.can("write:expenses") : !0);
   return React.createElement(
     "div",
     null,
+    React.createElement(BulkActions, { sel, t: n, kind: "expenses", extra: !1, toast: TT, onDelete: (ids) => t((z) => { const g = new Set(ids); return z.filter((x) => !g.has(x.id)); }) }),
     React.createElement(PageHeader, {
       title: n("exp_title"),
       subtitle: n("exp_subtitle"),
@@ -6376,6 +6537,7 @@ function ExpensesPage({ ctx: o }) {
               React.createElement(
                 TableRow,
                 null,
+                React.createElement(SelHead, { sel, t: n }),
                 React.createElement(Th, {
                   label: n(e === "Salary" ? "exp_field_month" : "col_date"),
                   sortKey: "date",
@@ -6419,7 +6581,8 @@ function ExpensesPage({ ctx: o }) {
               S.map((x) =>
                 React.createElement(
                   TableRow,
-                  { key: x.id },
+                  { key: x.id, "data-sel": sel.has(x.id) ? "" : void 0 },
+                  React.createElement(SelCell, { sel, id: x.id, t: n }),
                   React.createElement(TableCell, null, fmtDate(x.date)),
                   e === "Project" && React.createElement(TableCell, null, x.invNo),
                   React.createElement(TableCell, null, x.itemName),
@@ -6949,9 +7112,11 @@ function PackagesPage({ ctx: o }) {
     setDel(null);
     toast && toast(e("pkg_deleted"));
   }
+  const sel = useSelection(rows.filter((x) => x.cat), canW);
   return h(
     "div",
     null,
+    h(BulkActions, { sel, t: e, kind: "packages", extra: !1, toast: toast, onDelete: (ids) => setPk((z) => { const g = new Set(ids); return z.filter((x) => !g.has(x.id)); }) }),
     h(PageHeader, {
       title: e("pkg_title"),
       subtitle: e("pkg_subtitle"),
@@ -6972,6 +7137,7 @@ function PackagesPage({ ctx: o }) {
               h(
                 TableRow,
                 null,
+                h(SelHead, { sel, t: e }),
                 h(TableHead, { style: { width: 56 } }, e("item_no")),
                 h(Th, { label: e("pkg_col_name"), sortKey: "name", sort, setSort }),
                 h(Th, { label: e("pkg_col_price"), sortKey: "price", sort, setSort }),
@@ -6988,7 +7154,8 @@ function PackagesPage({ ctx: o }) {
               rows.map((x, i) =>
                 h(
                   TableRow,
-                  { key: x.id },
+                  { key: x.id, "data-sel": sel.has(x.id) ? "" : void 0 },
+                  h(SelCell, { sel, id: x.id, t: e, disabled: !x.cat }),
                   h(TableCell, { style: { color: BRAND.inkSoft } }, i + 1),
                   h(TableCell, { style: { fontWeight: 600 } }, x.name),
                   h(TableCell, { style: { whiteSpace: "nowrap" } }, Number(x.price) > 0 ? fmtRp(x.price) : "—"),

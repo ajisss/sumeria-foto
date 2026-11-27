@@ -28,6 +28,16 @@ const UI_CSS = `
   .ui-table .ui-th + .ui-th::before { content:""; position:absolute; left:0; top:11px; bottom:11px; width:1px; background:var(--c-line); }
   .ui-table .ui-tbody .ui-tr { transition:background-color .15s; }
   .ui-table .ui-tbody .ui-tr:hover { background:var(--c-grayBg); }
+  /* Checkbox pilih banyak data + baris terpilih */
+  .ui-cb { -webkit-appearance:none; appearance:none; display:inline-block; position:relative; width:17px; height:17px; margin:0; vertical-align:middle; border:1.5px solid var(--c-inkSoft); border-radius:5px; background:var(--c-surface); cursor:pointer; transition:background .12s, border-color .12s; }
+  .ui-cb:hover { border-color:var(--c-ink); }
+  .ui-cb:checked, .ui-cb:indeterminate { background:var(--c-blue); border-color:var(--c-blue); }
+  .ui-cb:checked::after { content:""; position:absolute; left:4.5px; top:1.5px; width:4px; height:8px; border:solid var(--c-onBlue); border-width:0 2px 2px 0; transform:rotate(45deg); }
+  .ui-cb:indeterminate::after { content:""; position:absolute; left:3px; top:6.5px; width:8px; height:2px; border-radius:1px; background:var(--c-onBlue); }
+  .ui-cb:focus-visible { outline:2px solid var(--c-blue); outline-offset:2px; }
+  .ui-table .ui-th.sel-th, .ui-table .ui-td.sel-td { width:44px; padding-right:0; }
+  .ui-table .ui-tbody .ui-tr[data-sel] { background:var(--c-blueFaint); }
+  .ui-table .ui-tbody .ui-tr[data-sel]:hover { background:var(--c-blueFaint); }
   .ui-table .ui-td { padding:13px 14px; vertical-align:middle; font-size:13.5px; color:var(--c-ink); border-bottom:1px solid var(--c-line); }
   .ui-table .ui-tbody .ui-tr:last-child .ui-td { border-bottom:none; }
   .ui-table [data-num] { text-align:right; font-variant-numeric:tabular-nums; }
