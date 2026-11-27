@@ -88,7 +88,8 @@ const pdfLogoSrc = () => PDF_LOGO_SM || LOGO_DATA_URI;
 
 function pdfLogo(t, x, y, w) {
   try {
-    t.addImage(pdfLogoSrc(), "PNG", x, y, w, w / LOGO_ASPECT, undefined, "FAST");
+    // Kanvas logo punya ruang kosong 48/1400 di kiri; digeser mundur supaya huruf "S" tepat di margin x.
+    t.addImage(pdfLogoSrc(), "PNG", x - (w * 48) / 1400, y, w, w / LOGO_ASPECT, undefined, "FAST");
   } catch (e) {
     console.error("logo embed failed", e);
   }
