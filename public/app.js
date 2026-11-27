@@ -5470,11 +5470,18 @@ function OrdersPage({ ctx: o }) {
     [d, f] = useState({ key: "date", dir: "desc" }),
     [openId, setOpenId] = useState(null),
     [noteId, setNoteId] = useState(null),
+    // PIC diambil dari Customer Data (customer.pic), dicocokkan lewat customerId, cadangannya nama customer.
+    custs = o.customers || [],
+    normName = (x) => String(x || "").trim().toLowerCase(),
+    custById = new Map(custs.map((x) => [x.id, x])),
+    custByName = new Map(custs.map((x) => [normName(x.name), x])),
     v = a.map((c) => {
       const ev = (c.items || []).map((x) => x.eventDate).filter(Boolean).sort(),
-        names = (c.items || []).map((x) => x.packageItem).filter(Boolean);
+        names = (c.items || []).map((x) => x.packageItem).filter(Boolean),
+        cu = custById.get(c.customerId) || custByName.get(normName(c.customerSnap && c.customerSnap.name));
       return {
         ...c,
+        picName: (cu && cu.pic && cu.pic.name) || "",
         total: docSubtotal(c.items),
         status: isFullyPaid(c) ? "Paid in Full" : "Not Yet Paid",
         eventKey: ev[0] || "9999-12-31",
@@ -5526,6 +5533,7 @@ function OrdersPage({ ctx: o }) {
                 null,
                 h(Th, { label: e("inv_number"), sortKey: "invNumber", sort: d, setSort: f }),
                 h(TableHead, null, e("quo_col_customer")),
+                h(TableHead, null, e("cust_col_pic")),
                 h(Th, { label: e("orders_col_event"), sortKey: "eventKey", sort: d, setSort: f }),
                 h(TableHead, null, e("orders_col_items")),
                 h(TableHead, null, e("col_status")),
@@ -5542,6 +5550,7 @@ function OrdersPage({ ctx: o }) {
                   { key: c.id },
                   h(TableCell, { style: { fontWeight: 600 } }, c.invNumber),
                   h(TableCell, null, c.customerSnap?.name),
+                  h(TableCell, { style: { whiteSpace: "nowrap", color: c.picName ? BRAND.ink : BRAND.inkSoft } }, c.picName || "\u2014"),
                   h(
                     TableCell,
                     { style: { whiteSpace: "nowrap" } },
