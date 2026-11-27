@@ -7753,14 +7753,19 @@ function buildInvoiceWaMessage(o) {
 }
 /* Kirim dokumen ke WhatsApp. SEMUA langkah sebelum share/open berjalan sinkron di dalam klik, karena browser
    (terutama Safari) memblokir window.open / navigator.share bila dipanggil setelah await (izin klik sudah hangus).
-   1) Web Share API + file PDF (Mac/HP): PDF terlampir langsung, nomor tujuan dipilih di WhatsApp.
+   1) Web Share API + file PDF (khusus HP/tablet; di desktop menu Share tidak punya WhatsApp/nomor tujuan): PDF terlampir langsung, nomor tujuan dipilih di WhatsApp.
    2) Cadangan: unduh PDF + buka wa.me ke nomor customer dengan teks; PDF dilampirkan manual. */
 function sendDocWhatsApp(kind, o) {
   const inv = kind === "invoice",
     text = inv ? buildInvoiceWaMessage(o) : buildQuotationWaMessage(o),
     phone = waPhone(o.customerSnap && o.customerSnap.phone),
     name = pdfFileName(inv ? o.invNumber : o.quoNumber, o),
-    openWa = () => window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(text), "_blank");
+    waUrl = "https://wa.me/" + phone + "?text=" + encodeURIComponent(text),
+    openWa = () => {
+      /* popup diblokir -> pindah tab ini ke WhatsApp supaya tetap terbuka */
+      if (!window.open(waUrl, "_blank")) window.location.href = waUrl;
+    },
+    mobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
   let pdf = null,
     file = null;
   try {
@@ -7776,7 +7781,7 @@ function sendDocWhatsApp(kind, o) {
     pdf.save(name);
     openWa();
   };
-  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+  if (mobile && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
     navigator.share({ files: [file], text }).catch((err) => {
       if (err && err.name === "AbortError") return; /* user menutup menu Share */
       console.error("share failed, fallback ke unduh + wa.me", err);
