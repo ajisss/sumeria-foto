@@ -194,6 +194,38 @@ describe("rbac data (per record)", () => {
     expect((await sync(staff, "invoices", [{ op: "delete", id: "inv-casc", version: 1 }])).data.cascaded).toBe(0);
   });
 
+  it("customer: nomor telepon / email yang sama ditolak (semua format nomor, email tak peka huruf besar)", async () => {
+    const admin = (await login("admin@x.test")).jar;
+    const up = (id: string, data: Record<string, unknown>, version = 0) => sync(admin, "customers", [{ op: "upsert", id, version, data: { id, ...data } }]);
+    expect((await up("dup-a", { name: "Dina", phone: "0812-1111-2222", email: "Dina@Mail.com" })).data.results[0].ok).toBe(true);
+    // nomor sama dengan format lain: 0xxx, +62 xxx, 62xxx
+    for (const phone of ["081211112222", "+62 812 1111 2222", "6281211112222"]) {
+      const r = (await up("dup-b", { name: "Bayu", phone })).data.results[0];
+      expect(r).toMatchObject({ ok: false, duplicate: { field: "phone", name: "Dina" } });
+    }
+    // email sama (beda huruf besar & spasi)
+    expect((await up("dup-b", { name: "Bayu", phone: "0813-0000-0001", email: " dina@mail.COM " })).data.results[0]).toMatchObject({ ok: false, duplicate: { field: "email", name: "Dina" } });
+    // data unik diterima; kosong tidak dianggap sama
+    expect((await up("dup-b", { name: "Bayu", phone: "0813-0000-0001", email: "bayu@mail.com" })).data.results[0].ok).toBe(true);
+    expect((await up("dup-c", { name: "Cici", phone: "", email: "" })).data.results[0].ok).toBe(true);
+    expect((await up("dup-d", { name: "Dodi", phone: "", email: "" })).data.results[0].ok).toBe(true);
+    // edit tanpa mengubah nomor/email tetap boleh; mengganti ke milik orang lain ditolak
+    expect((await up("dup-a", { name: "Dina Baru", phone: "0812-1111-2222", email: "Dina@Mail.com" }, 1)).data.results[0].ok).toBe(true);
+    expect((await up("dup-b", { name: "Bayu", phone: "0812 1111 2222", email: "bayu@mail.com" }, 1)).data.results[0]).toMatchObject({ ok: false, duplicate: { field: "phone" } });
+    // dua customer ganda dalam satu batch: yang kedua ditolak
+    const batch = await sync(admin, "customers", [
+      { op: "upsert", id: "dup-e", version: 0, data: { id: "dup-e", name: "Eka", phone: "0899-5555-6666" } },
+      { op: "upsert", id: "dup-f", version: 0, data: { id: "dup-f", name: "Fani", phone: "+62 899 5555 6666" } },
+    ]);
+    expect(batch.data.results.map((r: any) => r.ok)).toEqual([true, false]);
+    // data lama yang sudah ganda (sebelum aturan ini) masih bisa diedit selama nomor/email tidak diubah
+    await pool.query("insert into records (collection, id, data) values ('customers','legacy-1','{\"id\":\"legacy-1\",\"name\":\"L1\",\"phone\":\"0877-0000-0001\"}'),('customers','legacy-2','{\"id\":\"legacy-2\",\"name\":\"L2\",\"phone\":\"0877-0000-0001\"}')");
+    expect((await up("legacy-2", { name: "L2 edit", phone: "0877-0000-0001" }, 1)).data.results[0].ok).toBe(true);
+    // menghapus customer membebaskan nomornya
+    await sync(admin, "customers", [{ op: "delete", id: "dup-e", version: 1 }]);
+    expect((await up("dup-f", { name: "Fani", phone: "0899-5555-6666" })).data.results[0].ok).toBe(true);
+  });
+
   it("rev: tidak berubah -> unchanged; berubah -> data baru; urutan sisip terjaga", async () => {
     const { jar } = await login("owner@x.test");
     const first = await call("/api/data/expenses", { jar });

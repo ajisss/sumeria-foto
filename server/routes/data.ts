@@ -64,7 +64,19 @@ dataRoutes.get("/:key", async (c) => {
   return c.json({ rev, records });
 });
 
-type Result = { id: string; ok: boolean; version?: number; conflict?: boolean };
+type Duplicate = { field: "phone" | "email"; name: string };
+type Result = { id: string; ok: boolean; version?: number; conflict?: boolean; duplicate?: Duplicate };
+
+// Kunci pembanding customer. Aturan nomor HARUS sama dengan waPhone() di public/app.js:
+// 0812-3456-7890, +62 812 3456 7890, dan 6281234567890 dianggap nomor yang sama.
+function phoneKey(v: unknown) {
+  const raw = typeof v === "string" ? v.trim() : "";
+  const d = raw.replace(/[^0-9]/g, "");
+  if (!d) return "";
+  if (raw.startsWith("+")) return d;
+  return d.startsWith("0") ? "62" + d.slice(1) : d.startsWith("62") ? d : "62" + d;
+}
+const emailKey = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "");
 
 dataRoutes.post(
   "/:key/sync",
@@ -101,8 +113,33 @@ dataRoutes.post(
     // di transaksi yang sama (integritas data; berlaku untuk semua role yang boleh menghapus invoice).
     let cascaded = 0;
     await db().transaction(async (tx) => {
+      // Customer: nomor telepon / email tidak boleh sama dengan customer lain (cegah data ganda).
+      // Dicek di server (bukan hanya form) supaya berlaku juga untuk beberapa user/perangkat sekaligus.
+      // Field yang tidak berubah dari versi tersimpan tidak dicek lagi, jadi data lama yang sudah ganda tetap bisa diedit.
+      const custs = new Map<string, { name: string; phone: string; email: string }>();
+      if (key === "customers" && changes.some((x) => x.op === "upsert")) {
+        const rows = await tx.select({ id: R.id, data: R.data }).from(R).where(eq(R.collection, "customers"));
+        for (const r of rows) custs.set(r.id, { name: String(r.data.name ?? ""), phone: phoneKey(r.data.phone), email: emailKey(r.data.email) });
+      }
       for (const ch of changes) {
         const where = and(eq(R.collection, key), eq(R.id, ch.id), eq(R.version, ch.version));
+        if (key === "customers" && ch.op === "upsert") {
+          const prev = custs.get(ch.id);
+          const next = { name: String(ch.data.name ?? ""), phone: phoneKey(ch.data.phone), email: emailKey(ch.data.email) };
+          let dup: Duplicate | null = null;
+          for (const [id, o] of custs) {
+            if (id === ch.id) continue;
+            if (next.phone && next.phone !== prev?.phone && o.phone === next.phone) dup = { field: "phone", name: o.name };
+            else if (next.email && next.email !== prev?.email && o.email === next.email) dup = { field: "email", name: o.name };
+            if (dup) break;
+          }
+          if (dup) {
+            results.push({ id: ch.id, ok: false, duplicate: dup });
+            continue;
+          }
+          custs.set(ch.id, next);
+        }
+        if (key === "customers" && ch.op === "delete") custs.delete(ch.id);
         if (ch.op === "delete") {
           const del = await tx.delete(R).where(where).returning({ id: R.id });
           if (del.length) {
