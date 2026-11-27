@@ -25,7 +25,10 @@ const SB_CSS = `
   .sb.c { width:76px; min-width:76px; }
   .sb-top { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:2px 6px 16px; margin-bottom:2px; border-bottom:1px solid var(--sb-line); min-height:62px; }
   .sb.c .sb-top { justify-content:center; padding:2px 0 16px; }
-  .sb-brand img { height:24px; width:auto; display:block; filter:var(--sb-logo); }
+  .sb-brand img { height:24px; width:auto; display:block; }
+  .sb-brand .lg-dark { display:none; }
+  [data-theme="dark"] .sb-brand .lg-light { display:none; }
+  [data-theme="dark"] .sb-brand .lg-dark { display:block; }
   .sb-brand div { font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--sb-sub); margin-top:7px; }
   .sb.c .sb-brand { display:none; }
   .sb-toggle { flex-shrink:0; width:30px; height:30px; display:flex; align-items:center; justify-content:center; border:none; background:transparent; color:var(--sb-sub); border-radius:8px; cursor:pointer; }
@@ -131,7 +134,7 @@ function DesktopSidebar({ tab, setTab, can, overdueCount, t, lang, lastBackupAt,
     h(
       "div",
       { className: "sb-top" },
-      h("div", { className: "sb-brand" }, h("img", { src: LOGO_DATA_URI, alt: "Sumériapoto" })),
+      h("div", { className: "sb-brand" }, h("img", { className: "lg-light", src: LOGO_DATA_URI, alt: "Sumériapoto" }), h("img", { className: "lg-dark", src: LOGO_WHITE_DATA_URI, alt: "Sumériapoto" })),
       h("button", { className: "sb-toggle", onClick: toggle, "aria-label": collapsed ? L.expand : L.collapse, title: collapsed ? L.expand : L.collapse }, sbIcon(collapsed ? "right" : "left")),
     ),
     h(
