@@ -586,8 +586,7 @@ function AnalyticsPage({ ctx }) {
   const [bannerOpen, setBannerOpen] = useState(true);
   const [slide, setSlide] = useState(0);
   const [gMenu, setGMenu] = useState(false);
-  const [xMenu, setXMenu] = useState(false);
-  const [xBusy, setXBusy] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const [resp, setResp] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -681,30 +680,6 @@ function AnalyticsPage({ ctx }) {
     );
   }
 
-  // Export: PDF (lanskap, untuk presentasi) atau Excel. Isinya = data yang sedang tampil (filter tanggal & customer).
-  function runExport(kind) {
-    setXMenu(false);
-    if (xBusy) return;
-    setXBusy(true);
-    exportAnalytics(kind, {
-      lang,
-      S,
-      range,
-      rangeText: fmtDate(range.start) + " – " + fmtDate(range.end),
-      customerLabel: customer || S.all_customer,
-      cur,
-      old,
-      data,
-      canExp,
-      rate,
-    })
-      .catch((e) => {
-        console.error("analytics export failed", e);
-        alert(AX_STR[lang === "en" ? "en" : "id"].fail);
-      })
-      .finally(() => setXBusy(false));
-  }
-
   const statusRows = [
     { key: "paid", icon: "check", n: data.paid, color: "var(--an-1)" },
     { key: "partial", icon: "clock", n: data.partial, color: "var(--an-2)" },
@@ -756,18 +731,7 @@ function AnalyticsPage({ ctx }) {
           ),
         ),
       ),
-      h(
-        "div",
-        { style: { position: "relative" } },
-        h("button", { className: "an-export", "aria-haspopup": "menu", "aria-expanded": xMenu, disabled: xBusy || !resp, style: xBusy ? { opacity: 0.7 } : undefined, onClick: () => setXMenu((v) => !v), onBlur: () => setTimeout(() => setXMenu(false), 150) }, anIcon("download", 15), xBusy ? AX_STR[lang === "en" ? "en" : "id"].exporting : S.export, !xBusy && anIcon("chevron", 14)),
-        xMenu &&
-          h(
-            "div",
-            { className: "an-menu", role: "menu", style: { minWidth: 210 } },
-            h("button", { role: "menuitem", onMouseDown: (e) => e.preventDefault(), onClick: () => runExport("pdf") }, AX_STR[lang === "en" ? "en" : "id"].export_pdf),
-            h("button", { role: "menuitem", onMouseDown: (e) => e.preventDefault(), onClick: () => runExport("xlsx") }, AX_STR[lang === "en" ? "en" : "id"].export_xls),
-          ),
-      ),
+      h("button", { className: "an-export", disabled: !resp, onClick: () => setExportOpen(true) }, anIcon("download", 15), S.export),
     ),
 
     h(
@@ -952,6 +916,13 @@ function AnalyticsPage({ ctx }) {
 
     /* Di mobile, menu Home lama (grid tile) dipertahankan karena itu pintu masuk ke halaman lain. */
     h("div", { className: "an-mobile-only" }, h("h3", { style: { margin: "0 0 10px", fontSize: 14, color: BRAND.inkSoft, fontWeight: 500 } }, S.menu), h(HomePage, { ctx })),
+    // Export lanjutan: format (PDF / Excel) + periode (sesuai filter / per bulan / per tahun).
+    exportOpen &&
+      h(ExportDialog, {
+        lang,
+        onClose: () => setExportOpen(false),
+        base: { lang, S, range, customerValue: customer, customerLabel: customer || S.all_customer, cur, old, data, canExp },
+      }),
   );
 }
 

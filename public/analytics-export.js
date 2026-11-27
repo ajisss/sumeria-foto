@@ -46,10 +46,34 @@ const AX_STR = {
     count: "Jumlah",
     total: "Total",
     page: "Halaman",
-    export_pdf: "PDF (untuk presentasi)",
+    export_pdf: "PDF",
     export_xls: "Excel (.xlsx)",
     exporting: "Menyiapkan…",
     fail: "Export gagal. Coba lagi setelah koneksi internet aktif.",
+    report_month: "Laporan Bulanan",
+    report_year: "Laporan Tahunan",
+    vs_month: "vs bulan lalu",
+    vs_year: "vs tahun lalu",
+    trend12: "Tren 12 Bulan",
+    rev_of: "Revenue",
+    dlg_title: "Export Analytics",
+    dlg_sub: "Pilih format dan periode laporan.",
+    dlg_format: "Format",
+    dlg_pdf_sub: "Laporan visual dengan grafik",
+    dlg_xls_sub: "Data & tabel, siap diolah",
+    dlg_period: "Periode",
+    dlg_filter: "Sesuai filter halaman",
+    dlg_month: "Per bulan",
+    dlg_month_sub: "Satu bulan penuh + tren 12 bulan",
+    dlg_year: "Per tahun",
+    dlg_year_sub: "Satu tahun penuh, rincian per bulan",
+    dlg_cust: "Customer",
+    dlg_cancel: "Batal",
+    dlg_go: "Export",
+    sheet_target: "Target",
+    target_col: "Target",
+    real_col: "Realisasi",
+    pct_col: "Pencapaian",
   },
   en: {
     report: "Analytics Report",
@@ -94,10 +118,34 @@ const AX_STR = {
     count: "Count",
     total: "Total",
     page: "Page",
-    export_pdf: "PDF (for presentations)",
+    export_pdf: "PDF",
     export_xls: "Excel (.xlsx)",
     exporting: "Preparing…",
     fail: "Export failed. Try again once you're online.",
+    report_month: "Monthly Report",
+    report_year: "Annual Report",
+    vs_month: "vs last month",
+    vs_year: "vs last year",
+    trend12: "12-Month Trend",
+    rev_of: "Revenue",
+    dlg_title: "Export Analytics",
+    dlg_sub: "Choose the format and report period.",
+    dlg_format: "Format",
+    dlg_pdf_sub: "Visual report with charts",
+    dlg_xls_sub: "Data & tables, ready to analyse",
+    dlg_period: "Period",
+    dlg_filter: "Match page filter",
+    dlg_month: "By month",
+    dlg_month_sub: "One full month + 12-month trend",
+    dlg_year: "By year",
+    dlg_year_sub: "One full year, month-by-month breakdown",
+    dlg_cust: "Customer",
+    dlg_cancel: "Cancel",
+    dlg_go: "Export",
+    sheet_target: "Targets",
+    target_col: "Target",
+    real_col: "Actual",
+    pct_col: "Achievement",
   },
 };
 
@@ -153,7 +201,7 @@ function axPageChrome(t, S, d, pageNo, title) {
   const H = t.internal.pageSize.getHeight();
   const M = 48;
   pdfLogo(t, M, 28, 104);
-  pdfTxt(t, (S.report + "  ·  " + d.rangeText).toUpperCase(), W - M, 42, { size: 6.8, color: PDF_C.soft, align: "right", cs: 1.4 });
+  pdfTxt(t, (d.reportTitle + "  ·  " + (d.periodLabel || d.rangeText)).toUpperCase(), W - M, 42, { size: 6.8, color: PDF_C.soft, align: "right", cs: 1.4 });
   pdfRule(t, M, W - M, 64, PDF_C.rule, 0.6);
   pdfRule(t, M, M + 46, 64, PDF_C.gold, 1.8);
   if (title) pdfTxt(t, title, M, 104, { size: 25, font: "times", color: PDF_C.ink });
@@ -170,8 +218,9 @@ function axCover(t, S, d) {
   pdfLogo(t, M, 76, 250);
   pdfRule(t, M, W - M, 140, PDF_C.rule, 0.6);
   pdfRule(t, M, M + 70, 140, PDF_C.gold, 2.2);
-  pdfTxt(t, S.report, M, 250, { size: 46, font: "times", color: PDF_C.ink });
-  pdfTxt(t, d.rangeText, M, 290, { size: 15, color: PDF_C.text });
+  pdfTxt(t, d.reportTitle, M, 250, { size: 46, font: "times", color: PDF_C.ink });
+  pdfTxt(t, d.periodLabel || d.rangeText, M, 290, { size: 17, color: PDF_C.text });
+  if (d.periodLabel) pdfTxt(t, d.rangeText, M, 310, { size: 10.5, color: PDF_C.soft });
   pdfLabel(t, S.customer, M, 342);
   pdfTxt(t, d.customerLabel, M, 362, { size: 13, color: PDF_C.ink, font: "times", style: "bold" });
   pdfLabel(t, S.generated, M, 400);
@@ -203,7 +252,7 @@ function axKpiCard(t, S, x, y, w, h, label, valueText, delta) {
   }
   pdfTxt(t, delta.text, tx, y + 83, { size: 9, style: "bold", color: col });
   const tw = (t.setFont("helvetica", "bold"), t.setFontSize(9), t.getTextWidth(delta.text));
-  pdfTxt(t, S.vs_prev, tx + tw + 6, y + 83, { size: 8, color: PDF_C.soft });
+  pdfTxt(t, S.vsLabel || S.vs_prev, tx + tw + 6, y + 83, { size: 8, color: PDF_C.soft });
 }
 
 function axProgress(t, x, y, w, pct, color) {
@@ -276,13 +325,13 @@ function axSummaryPage(t, S, d) {
   pdfLabel(t, S.target, rxp + 20, py + 28);
   const tg = d.target;
   const has = (b) => b && b.percent !== null && b.percent !== undefined;
-  if (!tg || (!has(tg.month) && !has(tg.year))) {
+  const blocks = [];
+  if (tg && tg.showMonth !== false) blocks.push([S.monthly + " · " + tg.monthLabel, tg.month, "month"]);
+  if (tg) blocks.push([S.yearly + " · " + tg.yearLabel, tg.year, "year"]);
+  if (!tg || blocks.every(([, b]) => !has(b))) {
     pdfTxt(t, S.target_none, rxp + 20, py + 70, { size: 10.5, color: PDF_C.soft });
   } else {
-    [
-      [S.monthly + " · " + tg.monthLabel, tg.month],
-      [S.yearly + " · " + tg.yearLabel, tg.year],
-    ].forEach(([label, b], i) => {
+    blocks.forEach(([label, b, kind], i) => {
       const y0 = py + 56 + i * 96;
       pdfTxt(t, label, rxp + 20, y0, { size: 9.5, color: PDF_C.soft });
       if (!has(b)) {
@@ -290,7 +339,7 @@ function axSummaryPage(t, S, d) {
         return;
       }
       const pct = b.percent;
-      const color = i === 1 ? PDF_C.ink : pct < 30 ? AX_RED : pct < 70 ? [214, 164, 40] : AX_GREEN;
+      const color = kind === "year" ? PDF_C.ink : pct < 30 ? AX_RED : pct < 70 ? [214, 164, 40] : AX_GREEN;
       const pt = (Number.isInteger(pct) ? pct : pct.toFixed(1)) + "%";
       pdfTxt(t, pt, rxp + 20, y0 + 30, { size: 22, style: "bold", color: PDF_C.ink });
       t.setFont("helvetica", "bold");
@@ -310,6 +359,7 @@ function axChartPage(t, S, d) {
   const months = d.data.months;
   const hasData = months.length > 0 && months.some((m) => m.revenue || m.expense);
   pdfTxt(t, fmtRp(d.cur.revenue), M, 142, { size: 20, style: "bold", color: PDF_C.ink });
+  if (d.highlight) pdfTxt(t, S.rev_of + " " + d.periodLabel, M, 157, { size: 9, color: PDF_C.soft });
   // legenda (kanan)
   let lx = W - M;
   const legend = [[d.S.legend_revenue, AX_REV]];
@@ -350,12 +400,15 @@ function axChartPage(t, S, d) {
   const showVals = n <= 8;
   months.forEach((m, i) => {
     const gx = cx + slot * i + slot / 2;
+    const dim = d.highlight && m.key !== d.highlight; // mode bulanan: bulan lain dipucatkan
+    const cRev = dim ? [222, 205, 176] : AX_REV;
+    const cExp = dim ? [214, 214, 219] : AX_EXP;
     const bars = d.canExp
       ? [
-          [m.revenue || 0, AX_REV, gx - barW - 1.5],
-          [m.expense || 0, AX_EXP, gx + 1.5],
+          [m.revenue || 0, cRev, gx - barW - 1.5],
+          [m.expense || 0, cExp, gx + 1.5],
         ]
-      : [[m.revenue || 0, AX_REV, gx - barW / 2]];
+      : [[m.revenue || 0, cRev, gx - barW / 2]];
     bars.forEach(([v, col, bx]) => {
       const bh = (v / max) * ch;
       if (bh > 0.4) {
@@ -366,11 +419,12 @@ function axChartPage(t, S, d) {
       }
       if (showVals && v > 0) pdfTxt(t, anCompact(v), bx + barW / 2, bottom - bh - 5, { size: 7.4, color: PDF_C.text, align: "center" });
     });
-    pdfTxt(t, m.label, gx, bottom + 16, { size: n > 9 ? 7.4 : 8.6, color: PDF_C.soft, align: "center" });
+    const on = d.highlight && m.key === d.highlight;
+    pdfTxt(t, m.label, gx, bottom + 16, { size: n > 9 ? 7.4 : 8.6, color: on ? PDF_C.ink : PDF_C.soft, style: on ? "bold" : "normal", align: "center" });
   });
   // ringkasan di bawah grafik
   const best = months.reduce((a, b) => ((b.revenue || 0) > (a.revenue || 0) ? b : a), months[0]);
-  const avg = d.cur.revenue / Math.max(1, months.length);
+  const avg = months.reduce((a, b) => a + (b.revenue || 0), 0) / Math.max(1, months.length);
   const sy = H - 82;
   [
     [S.best_month, best.label + " · " + fmtRp(best.revenue || 0)],
@@ -419,14 +473,14 @@ function axPeoplePage(t, S, d) {
 
 function buildAnalyticsPdf(d) {
   if (typeof window.jspdf === "undefined") throw new Error("jsPDF not loaded");
-  const S = AX_STR[d.lang === "en" ? "en" : "id"];
+  const S = { ...AX_STR[d.lang === "en" ? "en" : "id"], vsLabel: d.vsLabel };
   const t = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
   axCover(t, S, d);
   t.addPage();
   axPageChrome(t, S, d, 2, S.summary);
   axSummaryPage(t, S, d);
   t.addPage();
-  axPageChrome(t, S, d, 3, S.by_month);
+  axPageChrome(t, S, d, 3, d.mode === "month" ? S.trend12 : S.by_month);
   axChartPage(t, S, d);
   t.addPage();
   axPageChrome(t, S, d, 4, S.people);
@@ -453,8 +507,8 @@ function buildAnalyticsWorkbook(d) {
     [d.S.g_collected, d.cur.paidOfInvoiced, "", ""],
   ];
   const aoa = [
-    [S.report],
-    [S.period, d.rangeText],
+    [d.reportTitle],
+    [S.period, d.periodLabel ? d.periodLabel + " (" + d.rangeText + ")" : d.rangeText],
     [S.customer, d.customerLabel],
     [S.generated, d.generated],
     [],
@@ -522,22 +576,65 @@ function buildAnalyticsWorkbook(d) {
     ),
     S.sheet_item,
   );
+  if (d.monthTargets && d.monthTargets.length) {
+    const rows = d.monthTargets.map((m) => [tgMonthLabel(m.month, d.lang, false), m.target === null ? "" : m.target, m.revenue, m.percent === null || m.percent === undefined ? "" : m.percent / 100]);
+    const ws = xlsSheet(
+      [{ h: S.month, w: 20, k: "t" }, { h: S.target_col, w: 22, k: "n" }, { h: S.real_col, w: 22, k: "n" }, { h: S.pct_col, w: 16, k: "n" }],
+      rows,
+      d.yearTarget ? [S.yearly + " " + d.yearTarget.year, d.yearTarget.target === null ? "" : d.yearTarget.target, d.yearTarget.revenue, d.yearTarget.percent === null || d.yearTarget.percent === undefined ? "" : d.yearTarget.percent / 100] : null,
+    );
+    // kolom Pencapaian = persen
+    for (let r = 1; r <= rows.length + 1; r++) {
+      const cell = ws[XLSX.utils.encode_cell({ r, c: 3 })];
+      if (cell && typeof cell.v === "number") cell.z = "0.0%";
+    }
+    XLSX.utils.book_append_sheet(wb, ws, S.sheet_target);
+  }
   return wb;
 }
 
 /* --------------------------------------------------------------- Entry ---- */
 
+const axPad2 = (n) => String(n).padStart(2, "0");
+const axLastDay = (y, m) => new Date(y, m, 0).getDate();
+const axTodayYmd = () => anYmd(new Date());
+
 function axFileBase(d) {
+  if (d.mode === "month") return "Sumeriapoto-Analytics-" + d.key;
+  if (d.mode === "year") return "Sumeriapoto-Analytics-" + d.key;
   return "Sumeriapoto-Analytics-" + d.range.start + "_" + d.range.end;
 }
 
-async function axLoadTarget(d) {
-  // Target bulan terakhir pada rentang + target tahunan. Gagal/tidak ada akses -> null (halaman tetap diekspor tanpa target).
+/** Bentuk data halaman dari respons /api/analytics (sama seperti yang dihitung AnalyticsPage). */
+function axShape(resp, S) {
+  const noName = S.no_name;
+  return {
+    range: resp.range,
+    canExp: resp.canExpenses,
+    cur: { ...resp.current, exp: resp.current.expenses },
+    prevCur: resp.current,
+    data: {
+      ...resp.status,
+      months: resp.months.map((m) => ({ key: m.key, label: monthLabel(m.key), revenue: m.revenue, expense: m.expense || 0 })),
+      topCust: resp.topCustomers.map((c) => ({ ...c, name: c.name || noName })),
+      topItems: resp.topItems.map((i) => ({ ...i, name: i.name || noName })),
+    },
+  };
+}
+
+function axFetch(start, end, customer) {
+  const qs = new URLSearchParams({ start, end, today: axTodayYmd() });
+  if (customer) qs.set("customer", customer);
+  return apiFetch("/api/analytics?" + qs.toString());
+}
+
+async function axLoadTarget(monthKey, lang, showMonth) {
+  // Gagal / tidak ada akses -> null (laporan tetap dibuat tanpa blok target).
   try {
-    const key = d.range.end.slice(0, 7);
-    const r = await apiFetch("/api/targets/progress?month=" + key);
+    const r = await apiFetch("/api/targets/progress?month=" + monthKey);
     return {
-      monthLabel: tgMonthLabel(r.month, d.lang, true),
+      showMonth,
+      monthLabel: tgMonthLabel(r.month, lang, true),
       yearLabel: String(r.year.year),
       month: { percent: r.percent, revenue: r.revenue, target: r.target },
       year: { percent: r.year.percent, revenue: r.year.revenue, target: r.year.target },
@@ -547,9 +644,187 @@ async function axLoadTarget(d) {
   }
 }
 
-async function exportAnalytics(kind, d) {
-  const full = { ...d, target: await axLoadTarget(d) };
-  full.generated = new Date().toLocaleString(d.lang === "en" ? "en-GB" : "id-ID", { dateStyle: "long", timeStyle: "short" });
-  if (kind === "pdf") buildAnalyticsPdf(full).save(axFileBase(full) + ".pdf");
-  else XLSX.writeFile(buildAnalyticsWorkbook(full), axFileBase(full) + ".xlsx");
+async function axLoadMonthTargets(year) {
+  try {
+    const r = await apiFetch("/api/targets?year=" + year);
+    return { months: r.months, yearly: { year: r.year, target: r.yearly.target, revenue: r.yearly.revenue, percent: r.yearly.percent } };
+  } catch (e) {
+    return null; // hanya role dengan izin kelola target
+  }
+}
+
+/** opts: { format: "pdf" | "xlsx", scope: "filter" | "month" | "year", year, month }. base = data halaman saat ini. */
+async function exportAnalytics(opts, base) {
+  const lang = base.lang === "en" ? "en" : "id";
+  const X = AX_STR[lang];
+  const customer = base.customerValue || "";
+  const generated = new Date().toLocaleString(lang === "en" ? "en-GB" : "id-ID", { dateStyle: "long", timeStyle: "short" });
+  let d;
+  if (opts.scope === "month") {
+    const y = Number(opts.year),
+      m = Number(opts.month);
+    const key = y + "-" + axPad2(m);
+    const today = axTodayYmd();
+    const mStart = key + "-01";
+    const mEnd = key + "-" + axPad2(axLastDay(y, m));
+    const end = mEnd > today ? today : mEnd;
+    const py = m === 1 ? y - 1 : y,
+      pm = m === 1 ? 12 : m - 1;
+    const prevStart = py + "-" + axPad2(pm) + "-01",
+      prevEnd = py + "-" + axPad2(pm) + "-" + axPad2(axLastDay(py, pm));
+    const trendStart = anYmd(new Date(y, m - 1 - 11, 1));
+    const [rCur, rTrend, rPrev, tg] = await Promise.all([axFetch(mStart, end, customer), axFetch(trendStart, end, customer), axFetch(prevStart, prevEnd, customer), axLoadTarget(key, lang, true)]);
+    d = axShape(rCur, base.S);
+    d.data.months = axShape(rTrend, base.S).data.months;
+    d.old = { ...rPrev.current, exp: rPrev.current.expenses };
+    d.mode = "month";
+    d.key = key;
+    d.highlight = key;
+    d.reportTitle = X.report_month;
+    d.periodLabel = tgMonthLabel(key, lang, true);
+    d.vsLabel = X.vs_month;
+    d.target = tg;
+  } else if (opts.scope === "year") {
+    const y = Number(opts.year);
+    const today = axTodayYmd();
+    const yEnd = y + "-12-31";
+    const end = yEnd > today ? today : yEnd;
+    const [rCur, rPrev, tg, mt] = await Promise.all([
+      axFetch(y + "-01-01", end, customer),
+      axFetch(y - 1 + "-01-01", y - 1 + "-12-31", customer),
+      axLoadTarget(y + "-12", lang, false),
+      axLoadMonthTargets(y),
+    ]);
+    d = axShape(rCur, base.S);
+    d.old = { ...rPrev.current, exp: rPrev.current.expenses };
+    d.mode = "year";
+    d.key = String(y);
+    d.reportTitle = X.report_year;
+    d.periodLabel = X.yearly + " " + y;
+    d.vsLabel = X.vs_year;
+    d.target = tg;
+    if (mt) {
+      d.monthTargets = mt.months;
+      d.yearTarget = mt.yearly;
+    }
+  } else {
+    d = { range: base.range, canExp: base.canExp, cur: base.cur, old: base.old, data: base.data };
+    d.mode = "range";
+    d.reportTitle = X.report;
+    d.vsLabel = X.vs_prev;
+    d.target = await axLoadTarget(base.range.end.slice(0, 7), lang, true);
+  }
+  d.lang = lang;
+  d.S = base.S;
+  d.rangeText = fmtDate(d.range.start) + " – " + fmtDate(d.range.end);
+  d.customerLabel = customer || base.S.all_customer;
+  d.rate = d.cur.invoiced > 0 ? Math.min(100, (d.cur.paidOfInvoiced / d.cur.invoiced) * 100) : 0;
+  d.generated = generated;
+  if (opts.format === "pdf") buildAnalyticsPdf(d).save(axFileBase(d) + ".pdf");
+  else XLSX.writeFile(buildAnalyticsWorkbook(d), axFileBase(d) + ".xlsx");
+}
+
+/* --------------------------------------------------------------- Dialog ---- */
+
+const AX_DLG_CSS = (BRAND) => `
+  .ax-lbl { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:${BRAND.inkSoft}; font-weight:600; margin:0 0 8px; }
+  .ax-sec { margin-bottom:20px; }
+  .ax-fmt { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .ax-opt { display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; padding:13px 14px; border:1px solid ${BRAND.line}; border-radius:12px; background:${BRAND.surface}; color:${BRAND.ink}; font:inherit; font-size:14px; font-weight:600; text-align:left; cursor:pointer; transition:border-color .15s, background .15s; }
+  .ax-opt small { font-size:12px; font-weight:400; color:${BRAND.inkSoft}; }
+  .ax-opt:hover { background:${BRAND.grayBg}; }
+  .ax-opt.on { border-color:${BRAND.ink}; box-shadow:0 0 0 1px ${BRAND.ink} inset; }
+  .ax-scopes { display:flex; flex-direction:column; gap:8px; }
+  .ax-row { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1px solid ${BRAND.line}; border-radius:12px; background:${BRAND.surface}; color:${BRAND.ink}; font:inherit; font-size:14px; text-align:left; cursor:pointer; width:100%; }
+  .ax-row:hover { background:${BRAND.grayBg}; }
+  .ax-row.on { border-color:${BRAND.ink}; box-shadow:0 0 0 1px ${BRAND.ink} inset; }
+  .ax-row .dot { width:16px; height:16px; border-radius:50%; border:1.5px solid ${BRAND.inkSoft}; flex:none; display:flex; align-items:center; justify-content:center; }
+  .ax-row.on .dot { border-color:${BRAND.ink}; }
+  .ax-row.on .dot::after { content:""; width:8px; height:8px; border-radius:50%; background:${BRAND.ink}; }
+  .ax-row b { font-weight:600; display:block; }
+  .ax-row small { display:block; color:${BRAND.inkSoft}; font-size:12px; margin-top:1px; }
+  .ax-pick { display:flex; gap:8px; margin:8px 0 2px 28px; }
+  .ax-pick select { flex:1; min-width:0; height:38px; border:1px solid ${BRAND.line}; border-radius:10px; background:${BRAND.surface}; color:${BRAND.ink}; padding:0 10px; font:inherit; font-size:14px; }
+  .ax-note { font-size:12.5px; color:${BRAND.inkSoft}; margin:0 0 4px; }
+`;
+
+function ExportDialog({ lang, base, onClose }) {
+  const h = React.createElement;
+  const T = AX_STR[lang === "en" ? "en" : "id"];
+  const now = new Date();
+  const [format, setFormat] = useState("pdf");
+  const [scope, setScope] = useState("filter");
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [busy, setBusy] = useState(false);
+  const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 4 + i);
+  const monthName = (m) => new Date(2000, m - 1, 1).toLocaleDateString(lang === "en" ? "en-GB" : "id-ID", { month: "long" });
+  const rangeText = fmtDate(base.range.start) + " – " + fmtDate(base.range.end);
+
+  const scopeRow = (key, title, sub, pick) =>
+    h(
+      "div",
+      { key },
+      h(
+        "button",
+        { type: "button", className: "ax-row" + (scope === key ? " on" : ""), onClick: () => setScope(key), "aria-pressed": scope === key },
+        h("span", { className: "dot" }),
+        h("span", null, h("b", null, title), h("small", null, sub)),
+      ),
+      scope === key && pick,
+    );
+  const yearSel = h("select", { "aria-label": T.dlg_year, value: year, onChange: (e) => setYear(Number(e.target.value)) }, years.map((y) => h("option", { key: y, value: y }, y)));
+
+  function go() {
+    if (busy) return;
+    setBusy(true);
+    exportAnalytics({ format, scope, year, month }, base)
+      .then(onClose)
+      .catch((e) => {
+        console.error("analytics export failed", e);
+        alert(T.fail);
+        setBusy(false);
+      });
+  }
+
+  return h(
+    Modal,
+    { title: T.dlg_title, subtitle: T.dlg_sub, onClose, width: 480, icon: Download },
+    h("style", null, AX_DLG_CSS(BRAND)),
+    h(
+      "div",
+      { className: "ax-sec" },
+      h("p", { className: "ax-lbl" }, T.dlg_format),
+      h(
+        "div",
+        { className: "ax-fmt" },
+        h("button", { type: "button", className: "ax-opt" + (format === "pdf" ? " on" : ""), onClick: () => setFormat("pdf"), "aria-pressed": format === "pdf" }, T.export_pdf, h("small", null, T.dlg_pdf_sub)),
+        h("button", { type: "button", className: "ax-opt" + (format === "xlsx" ? " on" : ""), onClick: () => setFormat("xlsx"), "aria-pressed": format === "xlsx" }, T.export_xls, h("small", null, T.dlg_xls_sub)),
+      ),
+    ),
+    h(
+      "div",
+      { className: "ax-sec" },
+      h("p", { className: "ax-lbl" }, T.dlg_period),
+      h(
+        "div",
+        { className: "ax-scopes" },
+        scopeRow("filter", T.dlg_filter, rangeText),
+        scopeRow(
+          "month",
+          T.dlg_month,
+          T.dlg_month_sub,
+          h("div", { className: "ax-pick" }, h("select", { "aria-label": "Bulan", value: month, onChange: (e) => setMonth(Number(e.target.value)) }, Array.from({ length: 12 }, (_, i) => h("option", { key: i, value: i + 1 }, monthName(i + 1)))), yearSel),
+        ),
+        scopeRow("year", T.dlg_year, T.dlg_year_sub, h("div", { className: "ax-pick" }, yearSel)),
+      ),
+    ),
+    h("p", { className: "ax-note" }, T.dlg_cust + ": " + base.customerLabel),
+    h(
+      "div",
+      { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 18 } },
+      h(Button, { variant: "secondary", icon: X, onClick: onClose }, T.dlg_cancel),
+      h(Button, { icon: Download, onClick: go, disabled: busy }, busy ? T.exporting : T.dlg_go),
+    ),
+  );
 }
