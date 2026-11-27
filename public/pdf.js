@@ -20,7 +20,7 @@ const PDF_C = {
 const PDF_FOOTER_LINES = [
   "Royal Tajur Residence",
   "Jl. Raya Tajur No. 170, Pakuan, Bogor Selatan \u00B7 Cluster Avebury 9 No. 17 \u00B7 Bogor, Jawa Barat",
-  "Phone 0851 3939 8639 \u00B7 0813 4000 4073 \u00B7 Instagram @Sumeriapoto",
+  "WhatsApp 0851 3939 8639 \u00B7 0813 4000 4073 \u00B7 Instagram @Sumeriapoto",
 ];
 const PDF_BANK = { bank: "BCA", number: "8761141988", name: "Mochamad Annas Afan" };
 
