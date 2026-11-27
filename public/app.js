@@ -1041,6 +1041,8 @@ const Search = makeIcon(
       pkg_desc_none: "Belum ada deskripsi",
       desc_select_all: "Pilih semua",
       desc_clear_all: "Kosongkan",
+      bulk_what_ledger: "{n} transaksi",
+      bulk_confirm_ledger: "{what} akan dihapus. Pemasukan yang dipilih dikembalikan menjadi belum dibayar, pengeluaran yang dipilih dihapus permanen.",
       bulk_selected: "{n} dipilih",
       bulk_select_all: "Pilih semua ({n})",
       bulk_clear: "Batal",
@@ -1453,6 +1455,8 @@ const Search = makeIcon(
       pkg_desc_none: "No description yet",
       desc_select_all: "Select all",
       desc_clear_all: "Clear",
+      bulk_what_ledger: "{n} transactions",
+      bulk_confirm_ledger: "{what} will be removed. Selected income is set back to unpaid; selected expenses are permanently deleted.",
       bulk_selected: "{n} selected",
       bulk_select_all: "Select all ({n})",
       bulk_clear: "Clear",
@@ -3448,7 +3452,7 @@ function SelCell({ sel, id, t, disabled }) {
     ? React.createElement(TableCell, { className: "sel-td" }, React.createElement(SelBox, { checked: sel.has(id), disabled, onToggle: (range) => sel.toggle(id, range), label: t("bulk_check_row") }))
     : null;
 }
-function BulkActions({ sel, t, kind, extra, onDelete, toast }) {
+function BulkActions({ sel, t, kind, extra, onDelete, toast, messageKey }) {
   const h = React.createElement,
     [ask, setAsk] = useState(!1),
     fill = (k, n, w, x) => t(k).replace("{n}", n).replace("{what}", w || "").replace("{extra}", x || "");
@@ -3481,7 +3485,7 @@ function BulkActions({ sel, t, kind, extra, onDelete, toast }) {
     ),
     ask &&
       h(ConfirmModal, {
-        message: fill("bulk_confirm", sel.count, fill("bulk_what_" + kind, sel.count), extra ? t("bulk_extra_" + kind) : ""),
+        message: fill(messageKey || "bulk_confirm", sel.count, fill("bulk_what_" + kind, sel.count), extra ? t("bulk_extra_" + kind) : ""),
         onConfirm: () => {
           const ids = sel.picked;
           onDelete(ids);
@@ -6787,9 +6791,21 @@ function LedgerPage({ ctx: o }) {
   }
   const s = m.reduce((i, h) => i + h.amount, 0),
     g = k.reduce((i, h) => i + h.amount, 0);
+  const sel = useSelection(B, o.can ? o.can("write:expenses") && o.can("write:invoices") : !0);
   return React.createElement(
     "div",
     null,
+    React.createElement(BulkActions, { sel, t: e, kind: "ledger", messageKey: "bulk_confirm_ledger", extra: !1, toast: o.showToast, onDelete: (ids) => {
+        const pick = new Set(ids),
+          picked = B.filter((x) => pick.has(x.id)),
+          exp = new Set(picked.filter((x) => x.type === "Expense").map((x) => x.id)),
+          pays = {};
+        picked.filter((x) => x.type === "Income").forEach((x) => {
+          (pays[x.invoiceId] = pays[x.invoiceId] || new Set()).add(x.paymentId);
+        });
+        if (Object.keys(pays).length) r((h) => h.map((b) => (pays[b.id] ? { ...b, payments: b.payments.map((z) => (pays[b.id].has(z.id) ? { ...z, paid: !1, paidDate: null } : z)) } : b)));
+        if (exp.size) n((h) => h.filter((b) => !exp.has(b.id)));
+      } }),
     React.createElement(PageHeader, {
       title: e("ledger_title"),
       subtitle: e("ledger_subtitle"),
@@ -6844,6 +6860,7 @@ function LedgerPage({ ctx: o }) {
               React.createElement(
                 TableRow,
                 null,
+                React.createElement(SelHead, { sel, t: e }),
                 React.createElement(Th, {
                   label: e("col_date"),
                   sortKey: "date",
@@ -6866,7 +6883,8 @@ function LedgerPage({ ctx: o }) {
               B.map((i) =>
                 React.createElement(
                   TableRow,
-                  { key: i.id },
+                  { key: i.id, "data-sel": sel.has(i.id) ? "" : void 0 },
+                  React.createElement(SelCell, { sel, id: i.id, t: e }),
                   React.createElement(TableCell, null, fmtDate(i.date)),
                   React.createElement(TableCell, null, i.invNo || "-"),
                   React.createElement(
