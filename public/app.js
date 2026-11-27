@@ -1033,6 +1033,14 @@ const Search = makeIcon(
       item_done: "Selesai",
       cust_dup_phone: "Nomor telepon ini sudah dipakai customer \"{name}\". Data customer yang sama tidak bisa ditambahkan dua kali.",
       cust_dup_email: "Email ini sudah dipakai customer \"{name}\". Data customer yang sama tidak bisa ditambahkan dua kali.",
+      pkg_col_desc: "Deskripsi",
+      pkg_field_desc: "Deskripsi",
+      pkg_desc_ph: "Satu poin per baris, contoh:\n1 Photographer\n1 Videographer\nAlbum 20x30 cm",
+      pkg_desc_hint: "{n} poin. Setiap baris jadi satu pilihan deskripsi di quotation/invoice, dan bisa di-unselect sesuai kebutuhan client.",
+      pkg_desc_required: "Deskripsi wajib diisi minimal satu poin.",
+      pkg_desc_none: "Belum ada deskripsi",
+      desc_select_all: "Pilih semua",
+      desc_clear_all: "Kosongkan",
       bulk_selected: "{n} dipilih",
       bulk_select_all: "Pilih semua ({n})",
       bulk_clear: "Batal",
@@ -1437,6 +1445,14 @@ const Search = makeIcon(
       item_done: "Done",
       cust_dup_phone: "This phone number is already used by customer \"{name}\". The same customer can't be added twice.",
       cust_dup_email: "This email is already used by customer \"{name}\". The same customer can't be added twice.",
+      pkg_col_desc: "Description",
+      pkg_field_desc: "Description",
+      pkg_desc_ph: "One point per line, e.g.:\n1 Photographer\n1 Videographer\nAlbum 20x30 cm",
+      pkg_desc_hint: "{n} point(s). Each line becomes a selectable description in quotations/invoices and can be unselected per client.",
+      pkg_desc_required: "Description is required (at least one point).",
+      pkg_desc_none: "No description yet",
+      desc_select_all: "Select all",
+      desc_clear_all: "Clear",
       bulk_selected: "{n} selected",
       bulk_select_all: "Select all ({n})",
       bulk_clear: "Clear",
@@ -1464,6 +1480,8 @@ const NAV_NEEDS = {
   margin: "read:expenses",
 };
 const PACKAGE_PRICES = {};
+// nama package -> daftar poin deskripsi (dari katalog Package Item); dipakai sebagai pilihan deskripsi di quotation/invoice.
+const PACKAGE_DESCS = {};
 const PACKAGE_DEFAULTS_BOX = { list: null };
 function visibleNav(can) {
   return NAV.filter((i) => (!i.perm || can(i.perm)) && (!NAV_NEEDS[i.key] || can(NAV_NEEDS[i.key])));
@@ -1738,7 +1756,7 @@ Tim Sumeriapoto`;
 }
 function quotationItemLabel(o) {
   const a = o.packageItem || "",
-    t = o.description || "";
+    t = splitDescLines(o.description).join(", ");
   return a.toLowerCase() === "additional" && t ? `${a} ${t}` : a || t || "Item";
 }
 function buildQuotationWaMessage(o) {
@@ -2161,9 +2179,11 @@ function MainApp({
     if (pkLoaded) {
       PACKAGE_ITEMS_LIST.length = 0;
       Object.keys(PACKAGE_PRICES).forEach((k) => delete PACKAGE_PRICES[k]);
+      Object.keys(PACKAGE_DESCS).forEach((k) => delete PACKAGE_DESCS[k]);
       PK.forEach((x) => {
         PACKAGE_ITEMS_LIST.push(x.name);
         PACKAGE_PRICES[x.name] = Number(x.price) || 0;
+        PACKAGE_DESCS[x.name] = pkgDescLines(x.description);
       });
     }
   }, [PK, pkLoaded]);
@@ -4330,25 +4350,35 @@ function CustomerModal({ customer: o, customers: all, onSave: a, onClose: t, t: 
     ),
   );
 }
-function parseDescValue(o) {
+// Deskripsi item dokumen = poin-poin dipisah baris baru (poin boleh berisi koma). Data lama dipisah koma tetap terbaca.
+function splitDescLines(o) {
+  const s = String(o || "");
+  return (s.includes("\n") ? s.split("\n") : s.split(","))
+    .map((a) => a.trim())
+    .filter(Boolean);
+}
+// Deskripsi di katalog Package Item: satu poin per baris (koma tidak memisahkan).
+function pkgDescLines(o) {
+  return String(o || "")
+    .split("\n")
+    .map((a) => a.trim())
+    .filter(Boolean);
+}
+function parseDescValue(o, opts = DESC_ITEMS_LIST) {
   if (!o) return { selected: [], custom: "" };
-  const a = o
-      .split(",")
-      .map((n) => n.trim())
-      .filter(Boolean),
-    t = a.filter((n) => DESC_ITEMS_LIST.includes(n)),
-    r = a.filter((n) => !DESC_ITEMS_LIST.includes(n)).join(", ");
+  const a = splitDescLines(o),
+    t = a.filter((n) => opts.includes(n)),
+    r = a.filter((n) => !opts.includes(n)).join(", ");
   return { selected: t, custom: r };
 }
 function buildDescValue(o, a) {
   const t = [...o];
-  return (a && a.trim() && t.push(a.trim()), t.join(", "));
+  return (a && a.trim() && t.push(a.trim()), t.join("\n"));
 }
-function splitDescLines(o) {
-  return (o || "")
-    .split(",")
-    .map((a) => a.trim())
-    .filter(Boolean);
+// Pilihan deskripsi untuk satu item: poin dari package-nya; kalau package belum punya deskripsi, daftar umum lama.
+function descOptionsFor(packageItem) {
+  const d = PACKAGE_DESCS[packageItem];
+  return d && d.length ? d : DESC_ITEMS_LIST;
 }
 function ItemsEditor({ items: o, setItems: a, t, fixed: FX }) {
   const [r, n] = useState({}),
@@ -4387,6 +4417,15 @@ function ItemsEditor({ items: o, setItems: a, t, fixed: FX }) {
           f(s, {
             packageItem: i,
             ...(PACKAGE_PRICES[i] > 0 && (!(Number(g.unitPrice) > 0) || Number(g.unitPrice) === PACKAGE_PRICES[g.packageItem]) ? { unitPrice: PACKAGE_PRICES[i] } : {}),
+            // Deskripsi ikut package: semua poin terpilih dulu, lalu bisa di-unselect yang tidak dibutuhkan client.
+            // Teks tambahan (custom) milik user dipertahankan; poin package sebelumnya diganti.
+            ...(() => {
+              const nd = PACKAGE_DESCS[i] || [],
+                od = descOptionsFor(g.packageItem),
+                keep = parseDescValue(g.description, od).custom;
+              if (nd.length) return { description: buildDescValue(nd, keep) };
+              return PACKAGE_DESCS[g.packageItem] && PACKAGE_DESCS[g.packageItem].length ? { description: keep } : {};
+            })(),
           })
         );
   }
@@ -4548,9 +4587,11 @@ function ItemsEditor({ items: o, setItems: a, t, fixed: FX }) {
                 TableCell,
                 null,
                 React.createElement(UiDescPick, {
-                  options: DESC_ITEMS_LIST,
+                  options: descOptionsFor(s.packageItem),
                   value: s.description,
                   onChange: (v) => f(g, { description: v }),
+                  allLabel: t("desc_select_all"),
+                  clearLabel: t("desc_clear_all"),
                   placeholder: t("item_pick_desc"),
                   customLabel: t("item_custom"),
                   customPlaceholder: t("item_desc_custom_placeholder"),
@@ -7095,15 +7136,20 @@ function PackageModal({ pkg: o, all: all, onSave: r, onClose: n, t: e }) {
   const h = React.createElement,
     [name, setName] = useState(o.name || ""),
     [price, setPrice] = useState(o.price || 0),
+    [desc, setDesc] = useState(o.description || ""),
+    [touched, setTouched] = useState(!1),
     dup = all.some((x) => x.id !== o.id && x.name.trim().toLowerCase() === name.trim().toLowerCase()),
-    ok = name.trim() && !dup;
+    lines = pkgDescLines(desc),
+    ok = name.trim() && !dup && lines.length > 0,
+    payload = () => ({ ...o, name: name.trim(), price: Number(price) || 0, description: lines.join("\n") }),
+    submit = () => (ok ? r(payload()) : setTouched(!0));
   return h(
     Modal,
-    { title: o.id ? e("pkg_modal_edit") : e("pkg_modal_add"), onClose: n, width: 480, icon: Package, subtitle: o.id ? e("pkg_modal_edit_sub") : e("pkg_modal_add_sub") },
+    { title: o.id ? e("pkg_modal_edit") : e("pkg_modal_add"), onClose: n, width: 520, icon: Package, subtitle: o.id ? e("pkg_modal_edit_sub") : e("pkg_modal_add_sub") },
     h(
       Field,
       { label: e("pkg_field_name"), full: !0 },
-      h("input", { style: inputStyle, value: name, autoFocus: !0, onChange: (x) => setName(x.target.value), onKeyDown: (x) => x.key === "Enter" && ok && r({ ...o, name: name.trim(), price: Number(price) || 0 }) }),
+      h("input", { style: inputStyle, value: name, autoFocus: !0, onChange: (x) => setName(x.target.value), onKeyDown: (x) => x.key === "Enter" && submit() }),
       dup && h("div", { style: { fontSize: 12, color: BRAND.red, marginTop: 6 } }, e("pkg_dup")),
     ),
     h(
@@ -7113,10 +7159,22 @@ function PackageModal({ pkg: o, all: all, onSave: r, onClose: n, t: e }) {
       h("div", { className: "ui-help" }, e("pkg_price_hint")),
     ),
     h(
+      Field,
+      { label: e("pkg_field_desc") + " *", full: !0 },
+      h("textarea", {
+        style: { ...inputStyle, minHeight: 130, resize: "vertical", lineHeight: 1.5, ...(touched && !lines.length ? { borderColor: "var(--c-red)" } : {}) },
+        value: desc,
+        placeholder: e("pkg_desc_ph"),
+        "aria-invalid": touched && !lines.length,
+        onChange: (x) => setDesc(x.target.value),
+      }),
+      touched && !lines.length ? h("div", { style: { fontSize: 12, color: BRAND.red, marginTop: 6 } }, e("pkg_desc_required")) : h("div", { className: "ui-help" }, e("pkg_desc_hint").replace("{n}", lines.length)),
+    ),
+    h(
       "div",
       { style: { display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 6 } },
       h(Button, { icon: X, variant: "secondary", onClick: n }, e("cancel")),
-      h(Button, { icon: Save, disabled: !ok, onClick: () => r({ ...o, name: name.trim(), price: Number(price) || 0 }) }, e("save")),
+      h(Button, { icon: Save, disabled: !!(name.trim() === "" || dup), onClick: submit }, e("save")),
     ),
   );
 }
@@ -7190,6 +7248,7 @@ function PackagesPage({ ctx: o }) {
                 h(SelHead, { sel, t: e }),
                 h(TableHead, { style: { width: 56 } }, e("item_no")),
                 h(Th, { label: e("pkg_col_name"), sortKey: "name", sort, setSort }),
+                h(TableHead, { style: { minWidth: 200 } }, e("pkg_col_desc")),
                 h(Th, { label: e("pkg_col_price"), sortKey: "price", sort, setSort }),
                 h(Th, { label: e("best_col_qty"), sortKey: "qty", sort, setSort }),
                 h(Th, { label: e("best_col_orders"), sortKey: "orders", sort, setSort }),
@@ -7208,6 +7267,15 @@ function PackagesPage({ ctx: o }) {
                   h(SelCell, { sel, id: x.id, t: e, disabled: !x.cat }),
                   h(TableCell, { style: { color: BRAND.inkSoft } }, i + 1),
                   h(TableCell, { style: { fontWeight: 600 } }, x.name),
+                  h(
+                    TableCell,
+                    { style: { maxWidth: 300, color: x.cat && !pkgDescLines(x.description).length ? BRAND.red : BRAND.inkSoft, fontSize: 12.5, lineHeight: 1.5 } },
+                    !x.cat
+                      ? "—"
+                      : pkgDescLines(x.description).length
+                        ? h("span", { title: pkgDescLines(x.description).join("\n"), style: { display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, pkgDescLines(x.description).join(" · "))
+                        : e("pkg_desc_none"),
+                  ),
                   h(TableCell, { style: { whiteSpace: "nowrap" } }, Number(x.price) > 0 ? fmtRp(x.price) : "—"),
                   h(TableCell, null, x.qty),
                   h(TableCell, null, x.orders),

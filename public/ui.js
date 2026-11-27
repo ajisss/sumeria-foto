@@ -549,9 +549,9 @@ function UiDate({ value, onChange, style, disabled, className }) {
 }
 
 /* ---- UiDescPick: dropdown multi-pilih (checkbox) + opsi "Custom" berisi teks bebas. value = string dipisah koma. ---- */
-function UiDescPick({ options, value, onChange, placeholder, customLabel, customPlaceholder }) {
+function UiDescPick({ options, value, onChange, placeholder, customLabel, customPlaceholder, allLabel, clearLabel }) {
   const h = React.createElement;
-  const parsed = parseDescValue(value);
+  const parsed = parseDescValue(value, options);
   const [open, setOpen] = React.useState(false);
   const [cu, setCu] = React.useState(!!parsed.custom);
   const ref = React.useRef(null);
@@ -576,6 +576,9 @@ function UiDescPick({ options, value, onChange, placeholder, customLabel, custom
       h(
         "div",
         { className: "ui-list" },
+        allLabel && options !== DESC_ITEMS_LIST && h("div", { style: { display: "flex", gap: 14, padding: "4px 12px 8px", fontSize: 12.5 } },
+          h("button", { type: "button", style: { border: "none", background: "none", padding: 0, color: "var(--c-ink)", fontWeight: 600, cursor: "pointer", font: "inherit" }, onClick: () => onChange(buildDescValue(options, parsed.custom)) }, allLabel),
+          h("button", { type: "button", style: { border: "none", background: "none", padding: 0, color: "var(--c-inkSoft)", cursor: "pointer", font: "inherit" }, onClick: () => onChange(buildDescValue([], parsed.custom)) }, clearLabel)),
         options.map((o) => h("button", { key: o, type: "button", className: "ui-opt", onClick: () => toggle(o) }, chk(parsed.selected.includes(o)), h("span", null, o))),
         h("button", { type: "button", className: "ui-opt", onClick: toggleCustom }, chk(cu), h("span", null, customLabel)),
         cu && h("input", { value: parsed.custom, placeholder: customPlaceholder, autoFocus: true, onChange: (e) => onChange(buildDescValue(parsed.selected, e.target.value)), style: { width: "calc(100% - 8px)", margin: "4px", padding: "0 10px" } }),
