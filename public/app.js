@@ -3564,18 +3564,18 @@ function ConfirmModal({ title: o, message: a, onConfirm: t, onCancel: r, t: n, c
     },
     React.createElement(
       "div",
-      { className: "modal-panel", role: "alertdialog", "aria-modal": "true", style: { background: BRAND.surface, borderRadius: 16, width: "100%", maxWidth: 420, position: "relative", boxShadow: "0 24px 48px -16px rgba(9,9,11,0.22), 0 0 0 1px var(--c-line)" } },
-      React.createElement("button", { onClick: r, "aria-label": "Tutup", className: "ui-dlg-close dlg-x" }, React.createElement(X, { size: 18 })),
+      { className: "modal-panel", role: "alertdialog", "aria-modal": "true", "aria-labelledby": "confirm-title", style: { background: BRAND.surface, borderRadius: 16, width: "100%", maxWidth: 420, position: "relative", boxShadow: "0 24px 48px -16px rgba(9,9,11,0.22), 0 0 0 1px var(--c-line)" } },
+      // Judul sejajar dengan tombol tutup; isi pesan tetap di body (bukan subtitle); tanpa ikon.
       React.createElement(
         "div",
-        { className: "dlg-head" },
-        React.createElement(DlgIcon, { icon: ci || AlertTriangle, tone: tn }),
-        React.createElement("h3", { className: "dlg-title" }, o || e("confirm_delete_title")),
-        React.createElement("p", { className: "dlg-sub" }, a),
+        { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "18px 18px 0 24px" } },
+        React.createElement("h3", { className: "dlg-title", id: "confirm-title" }, o || e("confirm_delete_title")),
+        React.createElement("button", { onClick: r, "aria-label": "Tutup", className: "ui-dlg-close", style: { flex: "none" } }, React.createElement(X, { size: 18 })),
       ),
       React.createElement(
         "div",
-        { className: "dlg-body", style: { paddingTop: 20 } },
+        { className: "dlg-body", style: { paddingTop: 12 } },
+        React.createElement("p", { style: { margin: "0 0 22px", fontSize: 14, lineHeight: 1.6, color: BRAND.inkSoft } }, a),
         React.createElement(
           "div",
           { style: { display: "flex", justifyContent: "flex-end", gap: 8 } },
