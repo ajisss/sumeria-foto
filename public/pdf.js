@@ -99,8 +99,9 @@ function pdfHeader(t, kind, o, first) {
   const W = t.internal.pageSize.getWidth();
   const title = kind === "invoice" ? "INVOICE" : "QUOTATION";
   if (first) {
-    pdfLogo(t, PDF_M, 48, 172);
-    pdfTxt(t, "PHOTOGRAPHY & VIDEOGRAPHY", PDF_M, 48 + 172 / LOGO_ASPECT + 15, { size: 6.8, color: PDF_C.soft, cs: 1.9 });
+    // Logo 206 pt (172 + 20%), tanpa tagline; tengah vertikal antara tepi atas halaman dan garis header (y=112).
+    const lw = 206.4;
+    pdfLogo(t, PDF_M, (112 - lw / LOGO_ASPECT) / 2, lw);
     pdfTxt(t, title, W - PDF_M, 74, { size: 25, font: "times", color: PDF_C.ink, align: "right", cs: 3.4 });
     pdfRule(t, PDF_M, W - PDF_M, 112, PDF_C.rule, 0.6);
     pdfRule(t, PDF_M, PDF_M + 58, 112, PDF_C.gold, 1.8);

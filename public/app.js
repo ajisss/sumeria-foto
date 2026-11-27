@@ -7119,7 +7119,7 @@ function PrintView({ target: o, onClose: a }) {
           "div",
           {
             style: {
-              padding: "36px clamp(18px, 6vw, 52px) 24px",
+              padding: "30px clamp(18px, 6vw, 52px)",
               display: "flex",
               justifyContent: "space-between",
               alignItems: "flex-start",
@@ -7128,25 +7128,12 @@ function PrintView({ target: o, onClose: a }) {
           },
           React.createElement(
             "div",
-            null,
+            { style: { alignSelf: "center" } },
             React.createElement("img", {
               src: LOGO_DATA_URI,
               alt: "Sum\xE9riapoto",
-              style: { height: 30, width: "auto", display: "block" },
+              style: { height: 36, width: "auto", display: "block" },
             }),
-            React.createElement(
-              "div",
-              {
-                style: {
-                  fontSize: 10.5,
-                  letterSpacing: "0.14em",
-                  color: BRAND.inkSoft,
-                  textTransform: "uppercase",
-                  marginTop: 6,
-                },
-              },
-              "Photography & Videography",
-            ),
           ),
           React.createElement(
             "div",
