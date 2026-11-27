@@ -1661,7 +1661,8 @@ function nextNumber(o, a, t) {
 function defaultDueDates(n, invDate, items) {
   const ev = (items || []).map((i) => i.eventDate).filter(Boolean).sort()[0],
     base = invDate || todayStr(),
-    last = ev ? addDays(ev, -7) : addDays(base, 30),
+    // Event kurang dari 7 hari lagi: jatuh tempo tidak boleh lebih awal dari tanggal invoice.
+    last = ev ? (addDays(ev, -7) < base ? base : addDays(ev, -7)) : addDays(base, 30),
     first = addDays(base, 7) < last ? addDays(base, 7) : last,
     span = Math.round((new Date(last) - new Date(first)) / 864e5);
   return Array.from({ length: n }, (_, i) => (n === 1 ? last : i === n - 1 ? last : addDays(first, Math.round((span * i) / (n - 1)))));
@@ -2288,7 +2289,7 @@ function MainApp({
           .top-toolbar button { width: 30px !important; min-width: 30px !important; height: 30px !important; font-size: 10.5px !important; }
         }
         @media (max-width: 520px) {
-          td, th { padding: 9px 8px !important; font-size: 12.5px !important; }
+          table:not([data-cards]) td, table:not([data-cards]) th { padding: 9px 8px !important; font-size: 12.5px !important; }
         }
       `,
     ),
@@ -3191,7 +3192,7 @@ function PageHeader({ title: o, subtitle: a, action: t, search: q }) {
   return t || q
     ? React.createElement(
         "div",
-        { style: { display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 } },
+        { className: "ph-bar", style: { display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 10 } },
         q && React.createElement("div", { style: { flex: "0 1 320px", minWidth: 200 } }, q),
         t,
       )
@@ -4477,7 +4478,7 @@ function ItemsEditor({ items: o, setItems: a, t, fixed: FX }) {
       },
       React.createElement(
         Table,
-        null,
+        { className: "ie-table" },
         React.createElement(
           TableHeader,
           null,
@@ -6246,6 +6247,10 @@ const CAL_CSS = `
     .cal-chip { background:var(--ev); }
     .cal-more { font-size:10px; }
     .cal-range { display:none; }
+    .cal-bar, .cal-bar-r { width:100%; }
+    .cal-bar-r > * { flex:1 1 100%; width:100% !important; min-width:0; }
+    .cal-bar .ui-seg { width:100%; }
+    .cal-bar .ui-seg button { flex:1; min-width:0; padding:0 6px; }
   }
 `;
 function blankExpenseRow(o) {
@@ -6449,6 +6454,7 @@ function ExpensesPage({ ctx: o }) {
       React.createElement(
         "div",
         {
+          className: "xp-wrap",
           style: {
             overflowX: "auto",
             border: `1px solid ${BRAND.line}`,
@@ -6458,7 +6464,7 @@ function ExpensesPage({ ctx: o }) {
         },
         React.createElement(
           Table,
-          null,
+          { className: "xp-table" },
           React.createElement(
             TableHeader,
             null,
@@ -6832,7 +6838,7 @@ function LedgerPage({ ctx: o }) {
     ),
     React.createElement(
       "div",
-      { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
+      { className: "ph-bar", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
       React.createElement("div", { style: { width: 240 } }, React.createElement(SearchBox, { value: l, onChange: p, placeholder: e("search_placeholder") })),
       React.createElement(
         "div",
@@ -7000,7 +7006,7 @@ function MarginPage({ ctx: o }) {
     ),
     React.createElement(
       "div",
-      { style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
+      { className: "ph-bar", style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 16, flexWrap: "wrap", justifyContent: "flex-end" } },
       React.createElement("div", { style: { width: 240 } }, React.createElement(SearchBox, { value: n, onChange: e, placeholder: r("search_placeholder") })),
       React.createElement(
         "div",

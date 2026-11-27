@@ -542,7 +542,7 @@ const AN_CSS = (B) => `
   }
   .an-mobile-only { display:none; }
   @media (max-width: 1100px) { .an-row3 { grid-template-columns: 1fr 1fr; } .an-row3 > :first-child { grid-column: 1 / -1; } }
-  @media (max-width: 980px) { .an-kpis { grid-template-columns: 1fr 1fr; } .an-row2 { grid-template-columns: 1fr; } }
+  @media (max-width: 1160px) { .an-kpis { grid-template-columns: 1fr 1fr; } } @media (max-width: 980px) { .an-row2 { grid-template-columns: 1fr; } }
   @media (max-width: 720px) { .an-row3 { grid-template-columns: 1fr; } .an-list > div { grid-template-columns: 40px minmax(0,1fr) auto; } .an-list .an-bar { display:none; } }
   @media (max-width: 560px) { .tg-filters { width:100%; margin-left:0 !important; flex-wrap:nowrap !important; } .tg-filters .an-chip { flex:1; min-width:0; } .tg-filters .an-chip > .lbl { display:none; } .tg-filters .an-chip > .val { flex:1; min-width:0; padding:0 4px; } }
   @media (max-width: 560px) { .an-kpis { grid-template-columns: 1fr; } .an-rows > div { grid-template-columns: 22px 1fr auto 44px; } }
