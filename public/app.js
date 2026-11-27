@@ -1862,6 +1862,8 @@ function useCollection(o, a, hooks) {
             }
             return;
           }
+          // Server ikut menghapus record turunan (pengeluaran Project saat invoice dihapus): muat ulang tampilan terkait.
+          if (res.cascaded) hk.current.onCascade && hk.current.onCascade();
           for (const x of res.results) {
             const ch = chunk.find((c) => c.id === x.id);
             if (x.ok) {
@@ -1928,7 +1930,7 @@ function useCollection(o, a, hooks) {
       dirty.current && flush();
     };
   }, []);
-  return [t, set, n];
+  return [t, set, n, reload];
 }
 function App() {
   const [o, a] = useState(null),
@@ -2075,10 +2077,11 @@ function MainApp({
     }),
     [p, d, f] = useCollection("payhub_customers", [], collHooks("customers")),
     [v, u, y] = useCollection("payhub_quotations", [], collHooks("quotations")),
-    [c, m, k] = useCollection("payhub_invoices", [], collHooks("invoices")),
-    [C, P, w] = useCollection("payhub_expenses", [], collHooks("expenses")),
+    expReload = useRef(null),
+    [c, m, k] = useCollection("payhub_invoices", [], { ...collHooks("invoices"), onCascade: () => expReload.current && expReload.current().catch(() => {}) }),
+    [C, P, w, reloadExpenses] = useCollection("payhub_expenses", [], collHooks("expenses")),
     [PK, setPK, pkLoaded] = useCollection("payhub_packages", [], collHooks("packages")),
-    B = f && y && k && w,
+    B = ((expReload.current = can("read:expenses") ? reloadExpenses : null), f && y && k && w),
     [I, s] = useState("home"),
     [g, i] = useState(null),
     [h, b] = useState(null),
@@ -6014,6 +6017,7 @@ function ExpensesPage({ ctx: o }) {
     [c, m] = useState(""),
     [k, C] = useState({ key: "date", dir: "desc" }),
     [P, w] = useState(null),
+    [orphanAsk, setOrphanAsk] = useState(!1),
     [mo, setMo] = useState(!1);
   useEffect(() => {
     (y([blankExpenseRow(e)]), v(""));
@@ -6079,6 +6083,10 @@ function ExpensesPage({ ctx: o }) {
       TT && TT("Expense deleted"));
   }
   const T = u.reduce((x, z) => x + i(z), 0);
+  // Pengeluaran Project yatim: terhubung ke invoice yang sudah tidak ada (data lama sebelum penghapusan otomatis dibuat).
+  const orphanIds = new Set(r.map((x) => x.id)),
+    orphans = a.filter((x) => x.category === "Project" && x.invoiceId && !orphanIds.has(x.invoiceId)),
+    idLang = o.lang !== "en";
   return React.createElement(
     "div",
     null,
@@ -6088,6 +6096,34 @@ function ExpensesPage({ ctx: o }) {
       search: React.createElement(SearchBox, { value: c, onChange: m, placeholder: n("search_placeholder") }),
       action: React.createElement(Button, { icon: Plus, onClick: () => setMo(!0) }, n("exp_add_btn")),
     }),
+    orphans.length > 0 &&
+      React.createElement(
+        "div",
+        { role: "status", style: { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 14px", margin: "0 0 14px", border: `1px solid ${BRAND.line}`, borderRadius: 12, background: BRAND.grayBg, fontSize: 13.5 } },
+        React.createElement(AlertTriangle, { size: 17, color: BRAND.red }),
+        React.createElement(
+          "span",
+          { style: { flex: 1, minWidth: 220 } },
+          idLang
+            ? `${orphans.length} pengeluaran Project tidak punya invoice lagi (invoice-nya sudah dihapus).`
+            : `${orphans.length} Project expense(s) no longer have an invoice (the invoice was deleted).`,
+        ),
+        React.createElement(Button, { variant: "secondary", icon: Trash2, onClick: () => setOrphanAsk(!0) }, idLang ? "Hapus" : "Delete"),
+      ),
+    orphanAsk &&
+      React.createElement(ConfirmModal, {
+        message: idLang
+          ? `${orphans.length} pengeluaran Project senilai ${fmtRp(orphans.reduce((x, z) => x + lineTotal(z), 0))} akan dihapus permanen.`
+          : `${orphans.length} Project expense(s) worth ${fmtRp(orphans.reduce((x, z) => x + lineTotal(z), 0))} will be permanently deleted.`,
+        onConfirm: () => {
+          const gone = new Set(orphans.map((x) => x.id));
+          t((z) => z.filter((x) => !gone.has(x.id)));
+          setOrphanAsk(!1);
+          TT && TT(idLang ? "Pengeluaran dihapus" : "Expenses deleted");
+        },
+        onCancel: () => setOrphanAsk(!1),
+        t: n,
+      }),
     React.createElement(
       "div",
       { className: "ui-tabs", role: "tablist" },
