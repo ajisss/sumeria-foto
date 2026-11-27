@@ -7701,7 +7701,7 @@ function PrintView({ target: o, onClose: a }) {
           React.createElement("br", null),
           "Jl. Raya Tajur No. 170, Pakuan, Bogor Selatan \xB7 Cluster Avebury 9 No. 17 \xB7 Bogor, Jawa Barat",
           React.createElement("br", null),
-          "Phone 0851 3939 8639 \xB7 0813 4000 4073 \xB7 Instagram @Sumeriapoto",
+          "WhatsApp 0851 3939 8639 \xB7 0813 4000 4073 \xB7 Instagram @Sumeriapoto",
           React.createElement("br", null),
           React.createElement("span", { style: { fontSize: 9.5, letterSpacing: "0.03em", color: BRAND.inkSoft, opacity: 0.75, display: "inline-block", marginTop: 8 } }, "Created by Sumeriapoto Payhub"),
         ),
