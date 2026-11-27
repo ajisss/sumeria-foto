@@ -1031,6 +1031,8 @@ const Search = makeIcon(
       item_desc_custom_placeholder: "Tulis deskripsi lainnya",
       item_pkg_custom_placeholder: "Tulis package item",
       item_done: "Selesai",
+      cust_dup_phone: "Nomor telepon ini sudah dipakai customer \"{name}\". Data customer yang sama tidak bisa ditambahkan dua kali.",
+      cust_dup_email: "Email ini sudah dipakai customer \"{name}\". Data customer yang sama tidak bisa ditambahkan dua kali.",
       bulk_selected: "{n} dipilih",
       bulk_select_all: "Pilih semua ({n})",
       bulk_clear: "Batal",
@@ -1433,6 +1435,8 @@ const Search = makeIcon(
       item_desc_custom_placeholder: "Write other description",
       item_pkg_custom_placeholder: "Write package item",
       item_done: "Done",
+      cust_dup_phone: "This phone number is already used by customer \"{name}\". The same customer can't be added twice.",
+      cust_dup_email: "This email is already used by customer \"{name}\". The same customer can't be added twice.",
       bulk_selected: "{n} selected",
       bulk_select_all: "Select all ({n})",
       bulk_clear: "Clear",
@@ -1868,7 +1872,9 @@ function useCollection(o, a, hooks) {
       while (dirty.current) {
         dirty.current = !1;
         const changes = computeChanges(latest.current);
-        let conflict = !1;
+        let conflict = !1,
+          otherConflict = !1;
+        const dups = [];
         for (let i = 0; i < changes.length; i += 200) {
           const chunk = changes.slice(i, i + 200);
           let res;
@@ -1897,7 +1903,11 @@ function useCollection(o, a, hooks) {
             if (x.ok) {
               if (ch.op === "delete") base.current.delete(x.id);
               else base.current.set(x.id, { version: x.version, json: ch._json });
-            } else conflict = !0;
+            } else {
+              conflict = !0;
+              // Ditolak server karena data ganda (mis. nomor telepon/email customer sudah ada): bukan bentrok edit.
+              x.duplicate ? dups.push(x.duplicate) : (otherConflict = !0);
+            }
           }
           // Sengaja TIDAK menyimpan res.rev: itu bisa memuat perubahan user lain yang belum kita muat.
         }
@@ -1905,7 +1915,8 @@ function useCollection(o, a, hooks) {
           // Record yang bentrok diganti versi server; sisanya sudah tersimpan.
           await reload();
           dirty.current = !1;
-          hk.current.onConflict && hk.current.onConflict();
+          if (dups.length) hk.current.onDuplicate && hk.current.onDuplicate(dups[0]);
+          if (otherConflict) hk.current.onConflict && hk.current.onConflict();
         }
       }
     } finally {
@@ -2098,6 +2109,7 @@ function MainApp({
     collHooks = (name) => ({
       readOnly: () => !can("write:" + name),
       onDenied: () => showToast(l("no_access") || "Tidak punya akses untuk mengubah data ini", "error"),
+      onDuplicate: (d) => showToast(l("cust_dup_" + d.field).replace("{name}", d.name), "error"),
       onConflict: () =>
         showToast("Data diubah pengguna lain. Data dimuat ulang, silakan ulangi perubahanmu.", "error"),
       onSaveError: () => showToast("Gagal menyimpan. Mencoba lagi\u2026", "error"),
@@ -4086,6 +4098,7 @@ function CustomersPage({ ctx: o }) {
     v &&
       React.createElement(CustomerModal, {
         customer: v,
+        customers: a,
         onSave: w,
         onClose: () => u(null),
         t: e,
@@ -4188,8 +4201,29 @@ function CustomerDetailModal({ customer: o, ctx: a, onClose: t }) {
     h("div", { style: { display: "flex", justifyContent: "flex-end", marginTop: 16 } }, h(Button, { icon: X, variant: "secondary", onClick: t }, e("inv_close"))),
   );
 }
-function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
-  const [n, e] = useState({
+/* Customer ganda: nomor telepon atau email yang sama dengan customer lain. Aturan nomor sama dengan waPhone() dan
+   phoneKey() di server (server/routes/data.ts), supaya cek di form dan di server konsisten. */
+function custPhoneKey(v) {
+  const raw = String(v || "").trim(),
+    d = raw.replace(/[^0-9]/g, "");
+  if (!d) return "";
+  if (raw.startsWith("+")) return d;
+  return d.startsWith("0") ? "62" + d.slice(1) : d.startsWith("62") ? d : "62" + d;
+}
+const custEmailKey = (v) => String(v || "").trim().toLowerCase();
+function findDuplicateCustomer(list, rec) {
+  const p = custPhoneKey(rec.phone),
+    m = custEmailKey(rec.email);
+  for (const c of list || []) {
+    if (c.id && c.id === rec.id) continue;
+    if (p && custPhoneKey(c.phone) === p) return { field: "phone", name: c.name || "" };
+    if (m && custEmailKey(c.email) === m) return { field: "email", name: c.name || "" };
+  }
+  return null;
+}
+function CustomerModal({ customer: o, customers: all, onSave: a, onClose: t, t: r }) {
+  const [dupErr, setDupErr] = useState(null),
+    [n, e] = useState({
       name: "",
       gender: "Female",
       email: "",
@@ -4197,7 +4231,15 @@ function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
       city: "",
       ...o,
     }),
-    l = (p) => (d) => e((f) => ({ ...f, [p]: d.target.value }));
+    l = (p) => (d) => (setDupErr(null), e((f) => ({ ...f, [p]: d.target.value })));
+  // Tolak langsung bila nomor/email sudah dipakai customer lain (hanya yang diubah, supaya data lama yang sudah ganda tetap bisa diedit).
+  function trySave() {
+    const prev = o.id ? (all || []).find((c) => c.id === o.id) : null,
+      probe = { ...n, phone: prev && custPhoneKey(prev.phone) === custPhoneKey(n.phone) ? "" : n.phone, email: prev && custEmailKey(prev.email) === custEmailKey(n.email) ? "" : n.email },
+      d = findDuplicateCustomer(all, probe);
+    if (d) return setDupErr(d);
+    a(n);
+  }
   return React.createElement(
     Modal,
     { title: o.id ? r("cust_modal_edit") : r("cust_modal_add"), onClose: t, icon: Users, subtitle: o.id ? r("cust_modal_edit_sub") : r("cust_modal_add_sub") },
@@ -4233,18 +4275,19 @@ function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
         Field,
         { label: r("cust_field_email") },
         React.createElement("input", {
-          style: inputStyle,
+          style: dupErr && dupErr.field === "email" ? { ...inputStyle, borderColor: "var(--c-red)" } : inputStyle,
           value: n.email,
           onChange: l("email"),
+          "aria-invalid": !!(dupErr && dupErr.field === "email"),
         }),
       ),
       React.createElement(
         Field,
         { label: r("cust_field_phone") },
         React.createElement(UiPhone, {
-          style: inputStyle,
+          style: dupErr && dupErr.field === "phone" ? { ...inputStyle, borderColor: "var(--c-red)" } : inputStyle,
           value: n.phone,
-          onChange: (v) => e((d) => ({ ...d, phone: v })),
+          onChange: (v) => (setDupErr(null), e((d) => ({ ...d, phone: v }))),
         }),
       ),
       React.createElement(
@@ -4257,6 +4300,13 @@ function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
         }),
       ),
     ),
+    dupErr &&
+      React.createElement(
+        "div",
+        { role: "alert", style: { display: "flex", alignItems: "flex-start", gap: 8, padding: "10px 12px", marginTop: 4, borderRadius: 10, border: "1px solid var(--c-redBorder)", background: "var(--c-redBg)", color: "var(--c-red)", fontSize: 13.5, lineHeight: 1.45 } },
+        React.createElement(AlertTriangle, { size: 16, style: { flex: "none", marginTop: 2 } }),
+        React.createElement("span", null, r("cust_dup_" + dupErr.field).replace("{name}", dupErr.name)),
+      ),
     React.createElement(
       "div",
       {
@@ -4264,7 +4314,7 @@ function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
           display: "flex",
           justifyContent: "flex-end",
           gap: 8,
-          marginTop: 6,
+          marginTop: 10,
         },
       },
       React.createElement(
@@ -4274,7 +4324,7 @@ function CustomerModal({ customer: o, onSave: a, onClose: t, t: r }) {
       ),
       React.createElement(
         Button,
-        { icon: Save, onClick: () => a(n), disabled: !n.name },
+        { icon: Save, onClick: trySave, disabled: !n.name },
         r("save"),
       ),
     ),
