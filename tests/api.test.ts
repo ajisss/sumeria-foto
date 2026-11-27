@@ -167,6 +167,33 @@ describe("rbac data (per record)", () => {
     expect(ids).not.toContain("e1");
   });
 
+  it("hapus invoice ikut menghapus pengeluaran Project yang terhubung (bahkan oleh role tanpa akses expenses)", async () => {
+    const owner = (await login("owner@x.test")).jar;
+    const staff = (await login("staff@x.test")).jar;
+    await sync(owner, "invoices", [
+      { op: "upsert", id: "inv-casc", version: 0, data: { id: "inv-casc" } },
+      { op: "upsert", id: "inv-keep", version: 0, data: { id: "inv-keep" } },
+    ]);
+    await sync(owner, "expenses", [
+      { op: "upsert", id: "ex-casc1", version: 0, data: { id: "ex-casc1", category: "Project", invoiceId: "inv-casc" } },
+      { op: "upsert", id: "ex-casc2", version: 0, data: { id: "ex-casc2", category: "Project", invoiceId: "inv-casc" } },
+      { op: "upsert", id: "ex-keep", version: 0, data: { id: "ex-keep", category: "Project", invoiceId: "inv-keep" } },
+      { op: "upsert", id: "ex-other", version: 0, data: { id: "ex-other", category: "Marketing", invoiceId: "" } },
+    ]);
+    // staff tidak punya akses expenses, tapi boleh menghapus invoice
+    expect((await call("/api/data/expenses", { jar: staff })).status).toBe(403);
+    const del = await sync(staff, "invoices", [{ op: "delete", id: "inv-casc", version: 1 }]);
+    expect(del.data.results[0].ok).toBe(true);
+    expect(del.data.cascaded).toBe(2);
+    const ids = (await call("/api/data/expenses", { jar: owner })).data.records.map((r: any) => r.id);
+    expect(ids).not.toContain("ex-casc1");
+    expect(ids).not.toContain("ex-casc2");
+    expect(ids).toContain("ex-keep");
+    expect(ids).toContain("ex-other");
+    // menghapus invoice yang sudah hilang (idempoten) tidak menghapus apa pun lagi
+    expect((await sync(staff, "invoices", [{ op: "delete", id: "inv-casc", version: 1 }])).data.cascaded).toBe(0);
+  });
+
   it("rev: tidak berubah -> unchanged; berubah -> data baru; urutan sisip terjaga", async () => {
     const { jar } = await login("owner@x.test");
     const first = await call("/api/data/expenses", { jar });

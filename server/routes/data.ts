@@ -97,12 +97,22 @@ dataRoutes.post(
     }
 
     const results: Result[] = [];
+    // Pengeluaran Project terhubung ke invoice lewat data.invoiceId. Saat invoice dihapus, pengeluaran itu ikut dihapus
+    // di transaksi yang sama (integritas data; berlaku untuk semua role yang boleh menghapus invoice).
+    let cascaded = 0;
     await db().transaction(async (tx) => {
       for (const ch of changes) {
         const where = and(eq(R.collection, key), eq(R.id, ch.id), eq(R.version, ch.version));
         if (ch.op === "delete") {
           const del = await tx.delete(R).where(where).returning({ id: R.id });
           if (del.length) {
+            if (key === "invoices") {
+              const gone = await tx
+                .delete(R)
+                .where(and(eq(R.collection, "expenses"), sql`${R.data}->>'invoiceId' = ${ch.id}`))
+                .returning({ id: R.id });
+              cascaded += gone.length;
+            }
             results.push({ id: ch.id, ok: true });
             continue;
           }
@@ -129,6 +139,7 @@ dataRoutes.post(
 
     const okCount = results.filter((r) => r.ok).length;
     if (okCount) await audit(user.id, "data.sync", key, { changes: okCount, conflicts: results.length - okCount });
-    return c.json({ results, rev: await revOf(key) });
+    if (cascaded) await audit(user.id, "data.cascade", "expenses", { removed: cascaded, reason: "invoice deleted" });
+    return c.json({ results, rev: await revOf(key), cascaded });
   },
 );
