@@ -1,5 +1,5 @@
-/* PayHub: export halaman Analytics ke PDF (lanskap, siap presentasi) dan Excel (.xlsx).
-   Dimuat setelah pdf.js; memakai PDF_C/pdfTxt/pdfRule/pdfLogo (pdf.js) dan fmtRp/fmtDate/anPct/anCompact/xlsSheet
+/* PayHub: export halaman Analytics ke PDF (satu halaman portrait panjang, gaya laporan) dan Excel (.xlsx).
+   Dimuat setelah pdf.js; memakai PDF_C/pdfTxt/pdfRule/pdfWrap (pdf.js) dan fmtRp/fmtDate/anPct/anCompact/xlsSheet
    (analytics.js / app.js) hanya saat tombol Export diklik. Semua angka diambil dari data yang sedang tampil di halaman. */
 
 const AX_STR = {
@@ -74,6 +74,21 @@ const AX_STR = {
     target_col: "Target",
     real_col: "Realisasi",
     pct_col: "Pencapaian",
+    fin_sum: "Ringkasan keuangan",
+    rev_lbl: "Pendapatan",
+    exp_lbl: "Pengeluaran",
+    profit_lbl: "Laba bersih",
+    out_lbl: "Outstanding",
+    out_cap: "Jumlah tagihan yang belum dilunasi.",
+    rev_cap: "Total pemasukan pada periode ini.",
+    exp_cap: "Total biaya pada periode ini.",
+    profit_cap: "Pendapatan dikurangi pengeluaran.",
+    laba: "Laba",
+    chart_title: "Pendapatan dan pengeluaran per bulan",
+    breakdown: "Rincian per bulan (Rp)",
+    inv_perf: "Performa invoice",
+    src: "Sumber: Sumeriapoto Payhub · data sampai",
+    gen_at: "Dibuat pada",
   },
   en: {
     report: "Analytics Report",
@@ -146,6 +161,21 @@ const AX_STR = {
     target_col: "Target",
     real_col: "Actual",
     pct_col: "Achievement",
+    fin_sum: "Financial summary",
+    rev_lbl: "Revenue",
+    exp_lbl: "Expenses",
+    profit_lbl: "Net profit",
+    out_lbl: "Outstanding",
+    out_cap: "Total invoiced amount not yet settled.",
+    rev_cap: "Total income in this period.",
+    exp_cap: "Total costs in this period.",
+    profit_cap: "Revenue minus expenses.",
+    laba: "Profit",
+    chart_title: "Revenue and expenses by month",
+    breakdown: "Monthly breakdown (Rp)",
+    inv_perf: "Invoice performance",
+    src: "Source: Sumeriapoto Payhub · data up to",
+    gen_at: "Generated on",
   },
 };
 
@@ -153,9 +183,6 @@ const AX_STR = {
 
 const AX_GREEN = [24, 98, 62];
 const AX_RED = [176, 48, 48];
-const AX_REV = PDF_C.gold; // revenue
-const AX_EXP = [150, 150, 158]; // expenses
-const AX_PANEL = [250, 249, 246];
 
 function axRoundRect(t, x, y, w, h, r, fill, stroke) {
   if (fill) t.setFillColor(fill[0], fill[1], fill[2]);
@@ -176,14 +203,21 @@ function axFit(t, s, maxW, size, style) {
   return str.trimEnd() + "…";
 }
 
-/** Batas atas sumbu "bulat" (1, 2, 2.5, 5 x 10^n) dan langkah 4-5 garis. */
+/** Sumbu "bulat": langkah 1/2/2.5/5 x 10^n dengan 4-6 interval; pilih batas atas terkecil yang memuat nilai. */
 function axNiceMax(v) {
-  if (v <= 0) return { max: 1, step: 0.25 };
-  const mag = Math.pow(10, Math.floor(Math.log10(v)));
-  for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) {
-    if (m * mag >= v) return { max: m * mag, step: (m * mag) / 4 };
+  if (v <= 0) return { max: 4, step: 1, n: 4 };
+  let best = null;
+  const k0 = Math.floor(Math.log10(v)) - 2;
+  for (let k = k0; k <= k0 + 4; k++) {
+    for (const m of [1, 2, 2.5, 5]) {
+      const step = m * Math.pow(10, k);
+      for (const n of [4, 5, 6]) {
+        const max = step * n;
+        if (max >= v && (!best || max < best.max - 1e-9 || (Math.abs(max - best.max) < 1e-9 && n < best.n))) best = { max, step, n };
+      }
+    }
   }
-  return { max: 10 * mag, step: (10 * mag) / 4 };
+  return best;
 }
 
 function axDelta(S, cur, old) {
@@ -193,298 +227,336 @@ function axDelta(S, cur, old) {
   if (p === null) return { text: cur ? S.new_badge : "—", tone: "flat", dir: 0 };
   if (Math.abs(p) < 0.05) return { text: "0.0%", tone: "flat", dir: 0 };
   const good = old.goodWhenDown ? p <= 0 : p >= 0;
-  return { text: (p > 0 ? "+" : "") + p.toFixed(1) + "%", tone: good ? "up" : "down", dir: p > 0 ? 1 : -1 };
+  const txt = Math.abs(p) >= 1000 ? (p > 0 ? "+" : "-") + "999%+" : (p > 0 ? "+" : "") + p.toFixed(1) + "%";
+  return { text: txt, tone: good ? "up" : "down", dir: p > 0 ? 1 : -1 };
 }
 
-function axPageChrome(t, S, d, pageNo, title) {
-  const W = t.internal.pageSize.getWidth();
-  const H = t.internal.pageSize.getHeight();
-  const M = 48;
-  pdfLogo(t, M, 28, 104);
-  pdfTxt(t, (d.reportTitle + "  ·  " + (d.periodLabel || d.rangeText)).toUpperCase(), W - M, 42, { size: 6.8, color: PDF_C.soft, align: "right", cs: 1.4 });
-  pdfRule(t, M, W - M, 64, PDF_C.rule, 0.6);
-  pdfRule(t, M, M + 46, 64, PDF_C.gold, 1.8);
-  if (title) pdfTxt(t, title, M, 104, { size: 25, font: "times", color: PDF_C.ink });
-  // footer
-  pdfRule(t, M, W - M, H - 38, PDF_C.rule, 0.6);
-  pdfTxt(t, "Created by Sumeriapoto Payhub", M, H - 22, { size: 6.8, color: PDF_C.faint, cs: 0.5 });
-  pdfTxt(t, String(pageNo), W - M, H - 22, { size: 7.2, color: PDF_C.faint, align: "right" });
+/* Laporan satu halaman panjang (portrait) bergaya dokumen: judul serif, kalimat ringkasan, kartu angka,
+   grafik batang per bulan, lalu tabel rincian. Tinggi halaman mengikuti isi (diukur dulu, lalu digambar). */
+
+const AX_BLUE = [38, 125, 228];
+const AX_ORANGE = [243, 115, 48];
+const AX_BLUE_DIM = [190, 214, 246];
+const AX_ORANGE_DIM = [250, 208, 186];
+const AX_PROFIT = [22, 128, 61];
+const AX_MON = {
+  id: ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
+
+function axMonthShort(key, lang, withYear) {
+  const [y, m] = key.split("-").map(Number);
+  const n = AX_MON[lang][m - 1] || key;
+  return withYear ? n + " " + String(y).slice(2) : n;
 }
 
-function axCover(t, S, d) {
-  const W = t.internal.pageSize.getWidth();
-  const H = t.internal.pageSize.getHeight();
-  const M = 64;
-  pdfLogo(t, M, 76, 250);
-  pdfRule(t, M, W - M, 140, PDF_C.rule, 0.6);
-  pdfRule(t, M, M + 70, 140, PDF_C.gold, 2.2);
-  pdfTxt(t, d.reportTitle, M, 250, { size: 46, font: "times", color: PDF_C.ink });
-  pdfTxt(t, d.periodLabel || d.rangeText, M, 290, { size: 17, color: PDF_C.text });
-  if (d.periodLabel) pdfTxt(t, d.rangeText, M, 310, { size: 10.5, color: PDF_C.soft });
-  pdfLabel(t, S.customer, M, 342);
-  pdfTxt(t, d.customerLabel, M, 362, { size: 13, color: PDF_C.ink, font: "times", style: "bold" });
-  pdfLabel(t, S.generated, M, 400);
-  pdfTxt(t, d.generated, M, 420, { size: 11, color: PDF_C.text });
-  // alamat di dasar sampul
-  pdfRule(t, M, W - M, H - 96, PDF_C.rule, 0.6);
-  pdfRule(t, M, M + 70, H - 96, PDF_C.gold, 1.8);
-  PDF_FOOTER_LINES.forEach((ln, i) =>
-    pdfTxt(t, ln, M, H - 76 + i * 12.5, { size: 8.2, color: i === 0 ? PDF_C.ink : PDF_C.soft, style: i === 0 ? "bold" : "normal" }),
-  );
-  pdfTxt(t, "Created by Sumeriapoto Payhub", W - M, H - 30, { size: 7, color: PDF_C.faint, align: "right", cs: 0.5 });
+/** "Rp 716,4 jt" / "Rp 1,2 M"; di bawah sejuta tampil penuh. */
+function axRpShort(n, lang) {
+  const v = Math.abs(n);
+  const dec = (x) => (Math.round(x * 10) / 10).toString().replace(".", lang === "en" ? "." : ",");
+  const sign = n < 0 ? "-" : "";
+  if (v >= 1e9) return sign + "Rp " + dec(v / 1e9) + (lang === "en" ? " bn" : " M");
+  if (v >= 1e6) return sign + "Rp " + dec(v / 1e6) + (lang === "en" ? " m" : " jt");
+  return fmtRp(n);
 }
 
-function axKpiCard(t, S, x, y, w, h, label, valueText, delta) {
-  axRoundRect(t, x, y, w, h, 8, PDF_C.white, PDF_C.rule);
-  pdfTxt(t, label.toUpperCase(), x + 16, y + 24, { size: 7, style: "bold", color: PDF_C.gold, cs: 1.3 });
-  pdfTxt(t, valueText, x + 16, y + 56, { size: valueText.length > 14 ? 16 : 19, style: "bold", color: PDF_C.ink });
-  if (!delta) return;
-  const col = delta.tone === "up" ? AX_GREEN : delta.tone === "down" ? AX_RED : PDF_C.soft;
-  let tx = x + 16;
-  if (delta.dir !== 0) {
-    // segitiga kecil (naik / turun)
-    t.setFillColor(col[0], col[1], col[2]);
-    const cx = x + 20.5,
-      cy = y + 80;
-    if (delta.dir > 0) t.triangle(cx - 4, cy + 3, cx + 4, cy + 3, cx, cy - 4, "F");
-    else t.triangle(cx - 4, cy - 3, cx + 4, cy - 3, cx, cy + 4, "F");
-    tx = x + 29;
-  }
-  pdfTxt(t, delta.text, tx, y + 83, { size: 9, style: "bold", color: col });
-  const tw = (t.setFont("helvetica", "bold"), t.setFontSize(9), t.getTextWidth(delta.text));
-  pdfTxt(t, S.vsLabel || S.vs_prev, tx + tw + 6, y + 83, { size: 8, color: PDF_C.soft });
-}
-
-function axProgress(t, x, y, w, pct, color) {
-  axRoundRect(t, x, y, w, 8, 4, [238, 238, 241]);
-  const p = Math.max(0, Math.min(100, pct || 0));
-  if (p > 0) axRoundRect(t, x, y, Math.max(8, (w * p) / 100), 8, 4, color);
-}
-
-function axSummaryPage(t, S, d) {
-  const W = t.internal.pageSize.getWidth();
-  const M = 48;
-  const gap = 14;
-  const cw = (W - M * 2 - gap * 3) / 4;
-  const cy = 128;
-  const ch = 108;
-  const cards = [
-    [d.S.revenue, fmtRp(d.cur.revenue), axDelta(S, d.cur.revenue, d.old && { v: d.old.revenue })],
-    [d.S.expenses, d.canExp ? fmtRp(d.cur.exp) : "—", d.canExp ? axDelta(S, d.cur.exp, d.old && { v: d.old.exp, goodWhenDown: true }) : { text: S.no_access, tone: "flat", dir: 0 }],
-    [d.S.profit, d.canExp ? fmtRp(d.cur.profit) : "—", d.canExp ? axDelta(S, d.cur.profit, d.old && { v: d.old.profit }) : { text: S.no_access, tone: "flat", dir: 0 }],
-    [d.S.outstanding, fmtRp(d.cur.outstanding), axDelta(S, d.cur.outstanding, d.old && { v: d.old.outstanding, goodWhenDown: true })],
-  ];
-  cards.forEach((c, i) => axKpiCard(t, S, M + i * (cw + gap), cy, cw, ch, c[0], c[1], c[2]));
-
-  const py = cy + ch + 22;
-  const ph = 250;
-  const lw = (W - M * 2 - gap) * 0.55;
-  const rw = W - M * 2 - gap - lw;
-
-  // --- Performa invoice
-  axRoundRect(t, M, py, lw, ph, 8, AX_PANEL, PDF_C.rule);
-  pdfLabel(t, S.perf, M + 20, py + 28);
-  pdfTxt(t, d.rate.toFixed(0) + "%", M + 20, py + 74, { size: 38, style: "bold", color: PDF_C.ink });
-  t.setFont("helvetica", "bold");
-  t.setFontSize(38);
-  const rx = M + 20 + t.getTextWidth(d.rate.toFixed(0) + "%") + 10;
-  pdfTxt(t, S.perf_sub, rx, py + 72, { size: 10, color: PDF_C.soft });
-  const bw = lw - 40;
-  const total = d.data.total;
-  const bx = M + 20;
-  const by = py + 94;
-  axRoundRect(t, bx, by, bw, 14, 7, [232, 232, 236]);
-  if (total > 0) {
-    const paidW = (bw * d.data.paid) / total;
-    const partW = (bw * d.data.partial) / total;
-    if (paidW > 0) axRoundRect(t, bx, by, Math.max(14, paidW), 14, 7, AX_REV);
-    if (partW > 0) {
-      t.setFillColor(214, 190, 148);
-      t.rect(bx + paidW, by, partW, 14, "F");
-    }
-  }
-  const rows = [
-    [d.S.paid, d.data.paid, AX_REV],
-    [d.S.partial, d.data.partial, [214, 190, 148]],
-    [d.S.unpaid, d.data.unpaid, [200, 200, 206]],
-    [d.S.overdue, d.data.overdue, AX_RED],
-  ];
-  rows.forEach((r, i) => {
-    const ry = by + 46 + i * 30;
-    t.setFillColor(r[2][0], r[2][1], r[2][2]);
-    t.circle(bx + 4, ry - 3, 3.4, "F");
-    pdfTxt(t, r[0], bx + 16, ry, { size: 10.5, color: PDF_C.text });
-    pdfTxt(t, r[1] + " " + S.inv, bx + bw - 54, ry, { size: 10.5, style: "bold", color: PDF_C.ink, align: "right" });
-    pdfTxt(t, (total ? Math.round((r[1] / total) * 100) : 0) + "%", bx + bw, ry, { size: 10.5, color: PDF_C.soft, align: "right" });
-    if (i < rows.length - 1) pdfRule(t, bx, bx + bw, ry + 13, PDF_C.rule, 0.4);
+/** Paragraf dengan potongan tebal. parts: string | { b: string }. Mengembalikan baseline baris terakhir. */
+function axRich(t, parts, x, y, maxW, size, lh) {
+  const toks = [];
+  parts.forEach((p) => {
+    const b = typeof p !== "string";
+    (b ? p.b : p).split(/(\s+)/).forEach((w) => w && toks.push({ w, b }));
   });
+  let cx = x,
+    cy = y;
+  toks.forEach((k) => {
+    t.setFont("helvetica", k.b ? "bold" : "normal");
+    t.setFontSize(size);
+    const w = t.getTextWidth(k.w);
+    if (/^\s+$/.test(k.w)) {
+      if (cx > x) cx += w;
+      return;
+    }
+    if (cx + w > x + maxW && cx > x) {
+      cx = x;
+      cy += lh;
+    }
+    pdfTxt(t, k.w, cx, cy, { size, style: k.b ? "bold" : "normal", color: k.b ? PDF_C.ink : PDF_C.text });
+    cx += w;
+  });
+  return cy;
+}
 
-  // --- Target revenue
-  const rxp = M + lw + gap;
-  axRoundRect(t, rxp, py, rw, ph, 8, AX_PANEL, PDF_C.rule);
-  pdfLabel(t, S.target, rxp + 20, py + 28);
+/** Tabel polos: header abu kecil, garis tipis antar baris. cols: [{ label, w (pecahan), align }]. cell = string | { t, color, bold }. */
+function axTable(t, x, y, w, cols, rows) {
+  const hh = 26,
+    rh = 28,
+    pad = 10;
+  const xs = [];
+  let cx = x;
+  cols.forEach((c) => {
+    xs.push(cx);
+    cx += w * c.w;
+  });
+  const put = (txt, i, by, o) => {
+    const colW = w * cols[i].w;
+    const right = cols[i].align === "right";
+    pdfTxt(t, axFit(t, txt, colW - pad * 2, o.size, o.bold ? "bold" : "normal"), right ? xs[i] + colW - pad : xs[i] + pad, by, {
+      size: o.size,
+      style: o.bold ? "bold" : "normal",
+      color: o.color,
+      align: right ? "right" : "left",
+    });
+  };
+  cols.forEach((c, i) => put(c.label, i, y + 16, { size: 8.8, color: PDF_C.soft }));
+  pdfRule(t, x, x + w, y + hh, PDF_C.rule, 0.6);
+  rows.forEach((r, ri) => {
+    const by = y + hh + ri * rh;
+    r.forEach((cell, i) => {
+      const o = typeof cell === "string" ? { t: cell } : cell;
+      put(o.t, i, by + 18, { size: 10.2, color: o.color || PDF_C.ink, bold: !!o.bold });
+    });
+    if (ri < rows.length - 1) pdfRule(t, x, x + w, by + rh, [236, 236, 240], 0.5);
+  });
+  return y + hh + rows.length * rh;
+}
+
+/** Segitiga naik/turun + teks perubahan kecil. */
+function axDeltaLine(t, S, x, y, delta) {
+  const col = delta.tone === "up" ? AX_GREEN : delta.tone === "down" ? AX_RED : PDF_C.soft;
+  let tx = x;
+  if (delta.dir !== 0) {
+    t.setFillColor(col[0], col[1], col[2]);
+    if (delta.dir > 0) t.triangle(x, y - 1, x + 7, y - 1, x + 3.5, y - 7, "F");
+    else t.triangle(x, y - 6, x + 7, y - 6, x + 3.5, y, "F");
+    tx = x + 11;
+  }
+  pdfTxt(t, delta.text, tx, y, { size: 8, style: "bold", color: col });
+  t.setFont("helvetica", "bold");
+  t.setFontSize(8);
+  const tw = t.getTextWidth(delta.text);
+  pdfTxt(t, S.vsLabel || S.vs_prev, tx + tw + 5, y, { size: 7.6, color: PDF_C.soft });
+}
+
+/** Menggambar seluruh laporan; mengembalikan tinggi total yang dibutuhkan (pt). */
+function axReport(t, S, d) {
+  const W = t.internal.pageSize.getWidth();
+  const M = 42,
+    cw = W - M * 2,
+    gap = 12;
+  const lang = d.lang === "en" ? "en" : "id";
+  const canExp = !!d.canExp;
+  let y = 46;
+
+  // --- judul
+  pdfTxt(t, d.rangeText + "  ·  " + d.customerLabel, M, y, { size: 8.6, color: PDF_C.soft });
+  pdfTxt(t, d.reportTitle, M, y + 30, { size: 22, font: "times", color: PDF_C.ink });
+  y += 56;
+
+  const ry = /^(\d{4})-01-01$/.exec(d.range.start);
+  const whole = ry && d.range.end.slice(0, 4) === ry[1];
+  const when =
+    d.mode === "month"
+      ? (lang === "en" ? "In " : "Pada ") + d.periodLabel
+      : d.mode === "year" || whole
+        ? (lang === "en" ? "Throughout " : "Sepanjang ") + (d.mode === "year" ? d.key : ry[1])
+        : (lang === "en" ? "For " : "Pada periode ") + d.rangeText;
+  const rev = { b: fmtRp(d.cur.revenue) },
+    exp = { b: fmtRp(d.cur.exp) },
+    out = { b: fmtRp(d.cur.outstanding) };
+  const lead =
+    lang === "en"
+      ? canExp
+        ? [when + ", revenue was ", rev, " and expenses ", exp, ", while ", out, " is still outstanding."]
+        : [when + ", revenue was ", rev, ", while ", out, " is still outstanding."]
+      : canExp
+        ? [when + " tercatat pendapatan ", rev, " dan pengeluaran ", exp, ", sementara ", out, " masih outstanding."]
+        : [when + " tercatat pendapatan ", rev, ", sementara ", out, " masih outstanding."];
+  y = axRich(t, lead, M, y, cw, 11.5, 17) + 36;
+
+  // --- ringkasan keuangan
+  pdfTxt(t, S.fin_sum, M, y, { size: 11, style: "bold", color: PDF_C.ink });
+  y += 16;
+  axRoundRect(t, M, y, cw, 100, 8, PDF_C.white, PDF_C.rule);
+  pdfTxt(t, S.out_lbl, M + 18, y + 27, { size: 9, color: PDF_C.soft });
+  pdfTxt(t, fmtRp(d.cur.outstanding), M + 18, y + 67, { size: 32, font: "times", color: PDF_C.ink });
+  pdfTxt(t, S.out_cap, M + 18, y + 86, { size: 8.6, color: PDF_C.soft });
+  y += 100 + gap;
+
+  const noAcc = { text: S.no_access, tone: "flat", dir: 0 };
+  const c3 = (cw - gap * 2) / 3;
+  const profitCol = d.cur.profit < 0 ? AX_RED : AX_PROFIT;
+  [
+    [S.rev_lbl, axRpShort(d.cur.revenue, lang), S.rev_cap, PDF_C.ink, d.old && axDelta(S, d.cur.revenue, { v: d.old.revenue })],
+    [S.exp_lbl, canExp ? axRpShort(d.cur.exp, lang) : "—", canExp ? S.exp_cap : S.no_access, PDF_C.ink, canExp && d.old ? axDelta(S, d.cur.exp, { v: d.old.exp, goodWhenDown: true }) : null],
+    [S.profit_lbl, canExp ? axRpShort(d.cur.profit, lang) : "—", canExp ? S.profit_cap : S.no_access, canExp ? profitCol : PDF_C.ink, canExp && d.old ? axDelta(S, d.cur.profit, { v: d.old.profit }) : null],
+  ].forEach((c, i) => {
+    const x = M + i * (c3 + gap);
+    axRoundRect(t, x, y, c3, 100, 8, PDF_C.white, PDF_C.rule);
+    pdfTxt(t, c[0], x + 16, y + 25, { size: 8.8, color: PDF_C.soft });
+    pdfTxt(t, c[1], x + 16, y + 52, { size: 17, font: "times", color: c[3] });
+    pdfWrap(t, c[2], c3 - 32, 8).slice(0, 2).forEach((ln, k) => pdfTxt(t, ln, x + 16, y + 68 + k * 10.5, { size: 8, color: PDF_C.soft }));
+    if (c[4]) axDeltaLine(t, S, x + 16, y + 91, c[4]);
+  });
+  y += 100 + 36;
+
+  // --- grafik per bulan
+  const months = d.data.months || [];
+  const withTx = months.filter((m) => m.revenue || (canExp && m.expense)).length;
+  pdfTxt(t, S.chart_title, M, y, { size: 11, style: "bold", color: PDF_C.ink });
+  pdfTxt(t, lang === "en" ? "Months with transactions: " + withTx + " of " + months.length + "." : "Bulan yang punya transaksi: " + withTx + " dari " + months.length + " bulan.", M, y + 19, { size: 9.2, color: PDF_C.soft });
+  y += 44;
+  let lx = M;
+  [[S.rev_lbl, AX_BLUE]].concat(canExp ? [[S.exp_lbl, AX_ORANGE]] : []).forEach(([lab, col]) => {
+    t.setFillColor(col[0], col[1], col[2]);
+    t.circle(lx + 3.5, y - 3, 3.5, "F");
+    pdfTxt(t, lab, lx + 12, y, { size: 9, color: PDF_C.soft });
+    t.setFont("helvetica", "normal");
+    t.setFontSize(9);
+    lx += 12 + t.getTextWidth(lab) + 18;
+  });
+  y += 12;
+  const ch = 214;
+  axRoundRect(t, M, y, cw, ch, 8, PDF_C.white, PDF_C.rule);
+  if (!months.length || !months.some((m) => m.revenue || m.expense)) {
+    pdfTxt(t, S.no_data, M + cw / 2, y + ch / 2, { size: 11, color: PDF_C.soft, align: "center" });
+  } else {
+    const x0 = M + 48,
+      x1 = M + cw - 16,
+      top = y + 18,
+      bottom = y + ch - 30,
+      ph = bottom - top;
+    const { max, step, n: gl } = axNiceMax(Math.max(1, ...months.map((m) => Math.max(m.revenue || 0, canExp ? m.expense || 0 : 0))));
+    for (let i = 0; i <= gl; i++) {
+      const v = step * i,
+        gy = bottom - (v / max) * ph;
+      pdfRule(t, x0, x1, gy, i === 0 ? PDF_C.faint : [236, 236, 240], i === 0 ? 0.8 : 0.5);
+      pdfTxt(t, anCompact(v), x0 - 8, gy + 2.8, { size: 8, color: PDF_C.soft, align: "right" });
+    }
+    const n = months.length,
+      slot = (x1 - x0) / n,
+      groupW = Math.min(slot * 0.78, 46),
+      barW = canExp ? groupW / 2 - 1 : Math.min(groupW, 28);
+    const multiYear = new Set(months.map((m) => m.key.slice(0, 4))).size > 1;
+    months.forEach((m, i) => {
+      const gx = x0 + slot * i + slot / 2;
+      const dim = d.highlight && m.key !== d.highlight;
+      const bars = canExp
+        ? [
+            [m.revenue || 0, dim ? AX_BLUE_DIM : AX_BLUE, gx - barW - 1],
+            [m.expense || 0, dim ? AX_ORANGE_DIM : AX_ORANGE, gx + 1],
+          ]
+        : [[m.revenue || 0, dim ? AX_BLUE_DIM : AX_BLUE, gx - barW / 2]];
+      bars.forEach(([v, col, bx]) => {
+        const bh = (v / max) * ph;
+        if (bh <= 0.4) return;
+        t.setFillColor(col[0], col[1], col[2]);
+        const r = Math.min(2.5, barW / 2, bh / 2);
+        t.roundedRect(bx, bottom - bh, barW, bh, r, r, "F");
+        t.rect(bx, bottom - Math.min(bh, 4), barW, Math.min(bh, 4), "F");
+      });
+      const on = d.highlight && m.key === d.highlight;
+      pdfTxt(t, axMonthShort(m.key, lang, multiYear), gx, bottom + 16, { size: multiYear ? 7.2 : 8.4, color: on ? PDF_C.ink : PDF_C.soft, style: on ? "bold" : "normal", align: "center" });
+    });
+  }
+  y += ch + 32;
+
+  // --- rincian per bulan
+  if (months.length) {
+    const sec = (title) => {
+      t.setFillColor(PDF_C.soft[0], PDF_C.soft[1], PDF_C.soft[2]);
+      t.triangle(M + 1, y - 7, M + 9, y - 7, M + 5, y - 1.5, "F");
+      pdfTxt(t, title, M + 15, y, { size: 9.8, color: PDF_C.soft });
+      y += 12;
+    };
+    sec(S.breakdown);
+    const cols = canExp
+      ? [{ label: S.month, w: 0.25 }, { label: S.rev_lbl, w: 0.25, align: "right" }, { label: S.exp_lbl, w: 0.25, align: "right" }, { label: S.laba, w: 0.25, align: "right" }]
+      : [{ label: S.month, w: 0.5 }, { label: S.rev_lbl, w: 0.5, align: "right" }];
+    const rows = months.map((m) => {
+      const base = [axMonthShort(m.key, lang, true), fmtRp(m.revenue || 0)];
+      if (!canExp) return base;
+      const pr = (m.revenue || 0) - (m.expense || 0);
+      return base.concat([fmtRp(m.expense || 0), { t: fmtRp(pr), color: pr < 0 ? AX_RED : PDF_C.ink }]);
+    });
+    y = axTable(t, M, y, cw, cols, rows) + 36;
+  }
+
+  // --- tambahan: performa invoice, target, customer & item teratas (gaya tabel yang sama)
+  const heading = (title, sub) => {
+    pdfTxt(t, title, M, y, { size: 11, style: "bold", color: PDF_C.ink });
+    if (sub) pdfTxt(t, sub, M, y + 18, { size: 9.2, color: PDF_C.soft });
+    y += sub ? 28 : 12;
+  };
+  const dd = d.data,
+    totInv = dd.total || 0;
+  heading(S.inv_perf, d.rate.toFixed(0) + "% " + S.perf_sub + ".");
+  y =
+    axTable(
+      t,
+      M,
+      y,
+      cw,
+      [{ label: S.status, w: 0.5 }, { label: S.count, w: 0.25, align: "right" }, { label: S.share, w: 0.25, align: "right" }],
+      [
+        [d.S.paid, dd.paid],
+        [d.S.partial, dd.partial],
+        [d.S.unpaid, dd.unpaid],
+        [d.S.overdue, dd.overdue],
+      ].map(([lab, v], i) => [lab, { t: v + " " + (lang === "en" && v === 1 ? "invoice" : S.inv), color: i === 3 && v ? AX_RED : PDF_C.ink }, (totInv ? Math.round((v / totInv) * 100) : 0) + "%"]),
+    ) + 36;
+
   const tg = d.target;
   const has = (b) => b && b.percent !== null && b.percent !== undefined;
-  const blocks = [];
-  if (tg && tg.showMonth !== false) blocks.push([S.monthly + " · " + tg.monthLabel, tg.month, "month"]);
-  if (tg) blocks.push([S.yearly + " · " + tg.yearLabel, tg.year, "year"]);
-  if (!tg || blocks.every(([, b]) => !has(b))) {
-    pdfTxt(t, S.target_none, rxp + 20, py + 70, { size: 10.5, color: PDF_C.soft });
-  } else {
-    blocks.forEach(([label, b, kind], i) => {
-      const y0 = py + 56 + i * 96;
-      pdfTxt(t, label, rxp + 20, y0, { size: 9.5, color: PDF_C.soft });
-      if (!has(b)) {
-        pdfTxt(t, S.target_none, rxp + 20, y0 + 26, { size: 10, color: PDF_C.faint });
-        return;
-      }
-      const pct = b.percent;
-      const color = kind === "year" ? PDF_C.ink : pct < 30 ? AX_RED : pct < 70 ? [214, 164, 40] : AX_GREEN;
-      const pt = (Number.isInteger(pct) ? pct : pct.toFixed(1)) + "%";
-      pdfTxt(t, pt, rxp + 20, y0 + 30, { size: 22, style: "bold", color: PDF_C.ink });
-      t.setFont("helvetica", "bold");
-      t.setFontSize(22);
-      pdfTxt(t, S.achieved, rxp + 20 + t.getTextWidth(pt) + 8, y0 + 29, { size: 9.5, color: PDF_C.soft });
-      axProgress(t, rxp + 20, y0 + 40, rw - 40, pct, color);
-      if (b.target !== undefined && b.target !== null)
-        pdfTxt(t, fmtRp(b.revenue) + " " + S.target_of + " " + fmtRp(b.target), rxp + 20, y0 + 64, { size: 8.8, color: PDF_C.soft });
-    });
+  const tgRows = [];
+  if (tg && tg.showMonth !== false && has(tg.month)) tgRows.push([S.monthly + " · " + tg.monthLabel, tg.month]);
+  if (tg && has(tg.year)) tgRows.push([S.yearly + " · " + tg.yearLabel, tg.year]);
+  if (tgRows.length) {
+    heading(S.target);
+    y =
+      axTable(
+        t,
+        M,
+        y,
+        cw,
+        [{ label: S.period, w: 0.37 }, { label: S.real_col, w: 0.23, align: "right" }, { label: S.target_col, w: 0.23, align: "right" }, { label: S.pct_col, w: 0.17, align: "right" }],
+        tgRows.map(([lab, b]) => [lab, fmtRp(b.revenue || 0), b.target != null ? fmtRp(b.target) : "—", (Number.isInteger(b.percent) ? b.percent : b.percent.toFixed(1)) + "%"]),
+      ) + 36;
   }
-}
 
-function axChartPage(t, S, d) {
-  const W = t.internal.pageSize.getWidth();
-  const H = t.internal.pageSize.getHeight();
-  const M = 48;
-  const months = d.data.months;
-  const hasData = months.length > 0 && months.some((m) => m.revenue || m.expense);
-  pdfTxt(t, fmtRp(d.cur.revenue), M, 142, { size: 20, style: "bold", color: PDF_C.ink });
-  if (d.highlight) pdfTxt(t, S.rev_of + " " + d.periodLabel, M, 157, { size: 9, color: PDF_C.soft });
-  // legenda (kanan)
-  let lx = W - M;
-  const legend = [[d.S.legend_revenue, AX_REV]];
-  if (d.canExp) legend.push([d.S.legend_expense, AX_EXP]);
-  legend
-    .slice()
-    .reverse()
-    .forEach(([lab, col]) => {
-      t.setFont("helvetica", "normal");
-      t.setFontSize(9.5);
-      const w = t.getTextWidth(lab);
-      pdfTxt(t, lab, lx, 140, { size: 9.5, color: PDF_C.text, align: "right" });
-      t.setFillColor(col[0], col[1], col[2]);
-      t.roundedRect(lx - w - 16, 132, 9, 9, 2, 2, "F");
-      lx -= w + 36;
-    });
-  if (!hasData) {
-    pdfTxt(t, S.no_data, W / 2, H / 2, { size: 12, color: PDF_C.soft, align: "center" });
-    return;
-  }
-  const cx = M + 52;
-  const cw = W - M - cx;
-  const top = 172;
-  const bottom = H - 120;
-  const ch = bottom - top;
-  const maxV = Math.max(1, ...months.map((m) => Math.max(m.revenue || 0, d.canExp ? m.expense || 0 : 0)));
-  const { max, step } = axNiceMax(maxV);
-  for (let i = 0; i <= 4; i++) {
-    const v = step * i;
-    const y = bottom - (v / max) * ch;
-    pdfRule(t, cx, cx + cw, y, i === 0 ? PDF_C.faint : PDF_C.rule, i === 0 ? 0.8 : 0.4);
-    pdfTxt(t, anCompact(v), cx - 8, y + 3, { size: 7.6, color: PDF_C.soft, align: "right" });
-  }
-  const n = months.length;
-  const slot = cw / n;
-  const groupW = Math.min(slot * 0.7, 64);
-  const barW = d.canExp ? groupW / 2 - 1.5 : Math.min(groupW, 36);
-  const showVals = n <= 8;
-  months.forEach((m, i) => {
-    const gx = cx + slot * i + slot / 2;
-    const dim = d.highlight && m.key !== d.highlight; // mode bulanan: bulan lain dipucatkan
-    const cRev = dim ? [222, 205, 176] : AX_REV;
-    const cExp = dim ? [214, 214, 219] : AX_EXP;
-    const bars = d.canExp
-      ? [
-          [m.revenue || 0, cRev, gx - barW - 1.5],
-          [m.expense || 0, cExp, gx + 1.5],
-        ]
-      : [[m.revenue || 0, cRev, gx - barW / 2]];
-    bars.forEach(([v, col, bx]) => {
-      const bh = (v / max) * ch;
-      if (bh > 0.4) {
-        t.setFillColor(col[0], col[1], col[2]);
-        t.roundedRect(bx, bottom - bh, barW, bh, Math.min(3, barW / 2, bh / 2), Math.min(3, barW / 2, bh / 2), "F");
-        // tutup sudut bawah supaya bar rata dengan garis dasar
-        t.rect(bx, bottom - Math.min(bh, 4), barW, Math.min(bh, 4), "F");
-      }
-      if (showVals && v > 0) pdfTxt(t, anCompact(v), bx + barW / 2, bottom - bh - 5, { size: 7.4, color: PDF_C.text, align: "center" });
-    });
-    const on = d.highlight && m.key === d.highlight;
-    pdfTxt(t, m.label, gx, bottom + 16, { size: n > 9 ? 7.4 : 8.6, color: on ? PDF_C.ink : PDF_C.soft, style: on ? "bold" : "normal", align: "center" });
-  });
-  // ringkasan di bawah grafik
-  const best = months.reduce((a, b) => ((b.revenue || 0) > (a.revenue || 0) ? b : a), months[0]);
-  const avg = months.reduce((a, b) => a + (b.revenue || 0), 0) / Math.max(1, months.length);
-  const sy = H - 82;
-  [
-    [S.best_month, best.label + " · " + fmtRp(best.revenue || 0)],
-    [S.avg_month, fmtRp(Math.round(avg))],
-  ].forEach(([lab, val], i) => {
-    const x = M + i * 300;
-    pdfLabel(t, lab, x, sy);
-    pdfTxt(t, val, x, sy + 17, { size: 11.5, style: "bold", color: PDF_C.ink });
-  });
-}
+  const cust = (dd.topCust || []).slice(0, 5);
+  const items = (dd.topItems || []).slice(0, 5);
+  const ranked = (title, colLabel, list, key, valLabel, total) => {
+    if (!list.length) return;
+    heading(title);
+    y =
+      axTable(
+        t,
+        M,
+        y,
+        cw,
+        [{ label: colLabel, w: 0.55 }, { label: valLabel, w: 0.27, align: "right" }, { label: S.share, w: 0.18, align: "right" }],
+        list.map((r, i) => [i + 1 + ".  " + r.name, fmtRp(r[key]), (total ? Math.round((r[key] / total) * 100) : 0) + "%"]),
+      ) + 36;
+  };
+  ranked(d.S.top_customers, S.cust_col, cust, "paid", S.paid_col, cust.reduce((a, c) => a + c.paid, 0));
+  ranked(d.S.top_items, S.item_col, items, "revenue", S.rev_lbl, (dd.topItems || []).reduce((a, c) => a + c.revenue, 0));
 
-function axRankedList(t, S, x, y, w, title, rows, nameKey, valKey, totalVal, unitColor) {
-  const rowH = 56;
-  axRoundRect(t, x, y, w, 58 + Math.max(rows.length, 1) * rowH - 14, 8, AX_PANEL, PDF_C.rule);
-  pdfLabel(t, title, x + 20, y + 28);
-  if (!rows.length) {
-    pdfTxt(t, S.no_data, x + 20, y + 62, { size: 10.5, color: PDF_C.soft });
-    return;
-  }
-  rows.forEach((r, i) => {
-    const ry = y + 58 + i * rowH;
-    const pct = totalVal ? (r[valKey] / totalVal) * 100 : 0;
-    pdfTxt(t, String(i + 1), x + 20, ry, { size: 9.5, style: "bold", color: PDF_C.gold });
-    const amt = fmtRp(r[valKey]);
-    t.setFont("helvetica", "bold");
-    t.setFontSize(10.5);
-    const aw = t.getTextWidth(amt);
-    pdfTxt(t, axFit(t, r[nameKey], w - 40 - 24 - aw - 18, 10.5, "normal"), x + 38, ry, { size: 10.5, color: PDF_C.ink });
-    pdfTxt(t, amt, x + w - 20, ry, { size: 10.5, style: "bold", color: PDF_C.ink, align: "right" });
-    axProgress(t, x + 38, ry + 9, w - 38 - 20 - 44, pct, unitColor);
-    pdfTxt(t, Math.round(pct) + "%", x + w - 20, ry + 16.5, { size: 8.6, color: PDF_C.soft, align: "right" });
-  });
-}
-
-function axPeoplePage(t, S, d) {
-  const W = t.internal.pageSize.getWidth();
-  const M = 48;
-  const gap = 14;
-  const w = (W - M * 2 - gap) / 2;
-  const y = 128;
-  const cust = d.data.topCust.slice(0, 5);
-  const items = d.data.topItems.slice(0, 5);
-  axRankedList(t, S, M, y, w, d.S.top_customers, cust, "name", "paid", cust.reduce((s, c) => s + c.paid, 0) || 1, AX_REV);
-  axRankedList(t, S, M + w + gap, y, w, d.S.top_items, items, "name", "revenue", Object.values(d.data.topItems).reduce((s, c) => s + c.revenue, 0) || 1, PDF_C.ink);
+  // --- footer
+  pdfTxt(t, S.src + " " + fmtDate(d.range.end), M, y, { size: 8.6, color: PDF_C.soft });
+  pdfTxt(t, S.gen_at + " " + d.generated + ".", W / 2, y + 34, { size: 8.2, color: PDF_C.soft, align: "center" });
+  return y + 34 + 44;
 }
 
 function buildAnalyticsPdf(d) {
   if (typeof window.jspdf === "undefined") throw new Error("jsPDF not loaded");
   const S = { ...AX_STR[d.lang === "en" ? "en" : "id"], vsLabel: d.vsLabel };
-  const t = new window.jspdf.jsPDF({ unit: "pt", format: "a4", orientation: "landscape" });
-  axCover(t, S, d);
-  t.addPage();
-  axPageChrome(t, S, d, 2, S.summary);
-  axSummaryPage(t, S, d);
-  t.addPage();
-  axPageChrome(t, S, d, 3, d.mode === "month" ? S.trend12 : S.by_month);
-  axChartPage(t, S, d);
-  t.addPage();
-  axPageChrome(t, S, d, 4, S.people);
-  axPeoplePage(t, S, d);
+  const mk = (h) => new window.jspdf.jsPDF({ unit: "pt", format: [595, h], orientation: "portrait" });
+  // Ukur dulu pada halaman tinggi, lalu gambar ulang pada halaman setinggi isi.
+  const H = Math.ceil(axReport(mk(8000), S, d));
+  const t = mk(Math.max(H, 640));
+  axReport(t, S, d);
+  t.setProperties({ title: d.reportTitle + " · " + d.rangeText });
   return t;
 }
 
